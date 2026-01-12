@@ -2,5 +2,5 @@ The alliance has lost its purpose after the war. [[Germany]] wants tight control
 
 ### Inspiration
 - Comintern/Cold War coup-proxy logic
-- intra-bloc crises like Hungary 1956 and PRague 1968 (mechanism-wise)
+- intra-bloc crises like Hungary 1956 and Prague 1968 (mechanism-wise)
 - preexisting WW2-era border disputes
