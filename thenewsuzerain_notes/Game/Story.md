@@ -1,0 +1,1 @@
+- the world seems stable at first but countries and ethnicities chafe against overextended empires leading to revolts and national rebirths

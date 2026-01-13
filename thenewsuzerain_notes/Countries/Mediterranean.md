@@ -1,0 +1,3 @@
+[[Italy]] competes with [[Germany]] over who controls the sea lanes in the Mediterranean. Victory doesn’t erase economic reality. Whoever controls shipping, ports, and oil contracts dominates. Italy’s empire dream collides with Germany’s need to feed Europe and fuel its military. Expect maritime harassment, “anti-piracy” blockades, and sponsored rebellions in coastal states.
+##### Inspiration
+- Great-power naval coercion traditions + Cold War-era economic pressure, but with WWII Mediterranean stakes.

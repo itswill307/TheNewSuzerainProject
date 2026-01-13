@@ -1,0 +1,2 @@
+- Newspapers from different countries each with their own biases are generated and available to the player
+	- decide on the interval of the newspaper, weekly or monthly
