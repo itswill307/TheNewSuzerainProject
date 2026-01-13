@@ -14,3 +14,5 @@ Balance: How do I make the game interesting to the player while staying realisti
 ### Player objectives
 - expand power bloc
 - gain natural resources (OIL)
+
+timespan: short (10-20 years) with complex story or long (60-100 years) with many regional conflicts and visual impacts from player choices
