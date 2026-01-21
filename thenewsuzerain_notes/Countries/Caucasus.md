@@ -1,3 +1,0 @@
-The [[Reichskommissariat]] in Transcaucasia fractures as [[Armenia]], [[Azerbaijan]], and [[Georgia]] fights become a corridor war. If the [[USSR]] is broken/partitioned or heavily destabilized, the Caucasus becomes the kind of corridor every empire wants (oil, passes, rail). Local nationalisms and old grievances flare, while occupiers try to manage it by arming proxies.
-##### Inspiration
-- Earlier 1918–21 Caucasus conflicts + late-20th-century Nagorno-Karabakh dynamics (as a template for grievance + external sponsorship)

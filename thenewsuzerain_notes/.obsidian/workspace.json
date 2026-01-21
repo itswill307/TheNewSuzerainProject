@@ -4,60 +4,31 @@
     "type": "split",
     "children": [
       {
-        "id": "756048f0020f070c",
+        "id": "6f81411067a8132d",
         "type": "tabs",
         "children": [
           {
-            "id": "9861aa84aff6a124",
+            "id": "0a853dc56d50dd59",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Game/Outline.md",
+                "file": "Game/Plan.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Outline"
-            }
-          },
-          {
-            "id": "a9415712fa8b97cc",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Countries/Caucasus.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Caucasus"
-            }
-          },
-          {
-            "id": "676bc5ff94644c73",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Countries/Axis.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Axis"
+              "title": "Plan"
             }
           }
-        ],
-        "currentTab": 2
+        ]
       },
       {
-        "id": "4329263b3ed1bf43",
+        "id": "72a2ba3d928318d8",
         "type": "tabs",
         "children": [
           {
-            "id": "14432958e1ebe581",
+            "id": "ce1bd61b9659429d",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -139,8 +110,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Axis.md",
-                "collapseAll": false,
+                "collapseAll": true,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
                 "showSearch": false,
@@ -149,7 +119,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for Axis"
+              "title": "Backlinks"
             }
           },
           {
@@ -158,12 +128,11 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Axis.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from Axis"
+              "title": "Outgoing links"
             }
           },
           {
@@ -201,21 +170,19 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Axis.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of Axis"
+              "title": "Outline"
             }
           }
         ]
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 326.5
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -228,26 +195,42 @@
       "bases:Create new base": false
     }
   },
-  "active": "14432958e1ebe581",
+  "active": "ce1bd61b9659429d",
   "lastOpenFiles": [
-    "Countries/Axis.md",
-    "Countries/Caucasus.md",
-    "Countries/Maghreb.md",
-    "Countries/Egypt.md",
-    "Countries/Russia.md",
-    "Countries/Middle East.md",
-    "Countries/Mediterranean.md",
-    "Countries/Greece.md",
-    "Countries/Balkans.md",
-    "Game/Outline.md",
-    "Game/Gameplay.md",
+    "Game/Plan.md",
+    "Countries/Europe/Germany.md",
+    "Countries/Asia/Japan.md",
+    "Countries/Europe/Italy.md",
+    "Countries/Americas/USA.md",
+    "Game/Divergences.md",
+    "Game/Conflict Starters.md",
+    "Countries/Asia/Central Asia.md",
+    "Countries/Europe/Balkans.md",
     "Game/Story.md",
-    "Countries/Reichskommissariat.md",
-    "Game/Choices matter.md",
+    "Game/Timeline.md",
+    "Untitled.base",
+    "Countries/Asia/India.md",
+    "Countries/Africa/Middle East.md",
+    "Countries/Asia/Southeast Asia.md",
+    "Countries/Asia/Korea.md",
+    "Countries/Asia/China.md",
+    "Countries/Europe/Caucasus.md",
+    "Countries/Europe/Hungary.md",
+    "Countries/Europe/Axis.md",
+    "Game/Gameplay.md",
+    "Game/Choices.md",
+    "Countries/Europe/Mediterranean.md",
+    "Untitled",
+    "Countries/Americas",
+    "Countries/Europe/Russia.md",
+    "Reichskommissariat.md",
+    "Countries/Europe/Greece.md",
+    "Countries/Africa/Maghreb.md",
+    "Countries/Asia",
+    "Countries/Africa",
+    "Countries/Europe",
     "Untitled.canvas",
     "Countries",
-    "Game",
-    "Serbia.md",
-    "Reichkommisariats.md"
+    "Game"
   ]
 }
