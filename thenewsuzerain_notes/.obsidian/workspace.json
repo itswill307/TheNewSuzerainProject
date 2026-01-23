@@ -4,16 +4,16 @@
     "type": "split",
     "children": [
       {
-        "id": "72a2ba3d928318d8",
+        "id": "76352d5b9862a54f",
         "type": "tabs",
         "children": [
           {
-            "id": "47ae1909b31bab10",
+            "id": "0586d11b95445dc1",
             "type": "leaf",
             "state": {
               "type": "excalidraw",
               "state": {
-                "file": "Game/UI/UI Mockup.md"
+                "file": "Game/UI Mockup.md"
               },
               "icon": "excalidraw-icon",
               "title": "UI Mockup"
@@ -111,7 +111,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Game/UI/UI Mockup.md",
+                "file": "Game/UI Mockup.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
@@ -181,13 +181,15 @@
       "obsidian-excalidraw-plugin:New drawing": false
     }
   },
-  "active": "47ae1909b31bab10",
+  "active": "0586d11b95445dc1",
   "lastOpenFiles": [
-    "Game/UI/wt3map.png",
-    "Game/UI/UI Mockup.md",
+    "Game/UI_images/48US.svg",
+    "Game/UI Mockup.md",
+    "Game/UI_images",
+    "Game/UI_images/wt3map.png",
     "Game/UI",
-    "Game/UI/16-9grid.png",
-    "Game/UI/eqrecmap.png",
+    "Game/UI_images/16-9grid.png",
+    "Game/UI_images/eqrecmap.png",
     "Pasted Image 20260123005756_227 1.png",
     "Pasted Image 20260123005404_847.png",
     "Pasted Image 20260123004132_083.png",
