@@ -111,12 +111,11 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Game/UI Mockup.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from UI Mockup"
+              "title": "Outgoing links"
             }
           },
           {
@@ -181,10 +180,10 @@
       "obsidian-excalidraw-plugin:New drawing": false
     }
   },
-  "active": "0586d11b95445dc1",
+  "active": "373e637c1350e2d5",
   "lastOpenFiles": [
-    "Game/UI_images/48US.svg",
     "Game/UI Mockup.md",
+    "Game/UI_images/48US.svg",
     "Game/UI_images",
     "Game/UI_images/wt3map.png",
     "Game/UI",
