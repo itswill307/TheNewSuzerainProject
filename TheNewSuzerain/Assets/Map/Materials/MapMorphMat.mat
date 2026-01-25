@@ -120,17 +120,17 @@ Material:
     - _HeightBias: 0
     - _HeightLOD: 0
     - _HeightScale: 0
-    - _HoverID: 1724
+    - _HoverID: -1
     - _Metallic: 0
     - _Mode: 0
-    - _Morph: 0
+    - _Morph: 0.5236423
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QueueControl: 0
     - _QueueOffset: 0
     - _Radius: 100
     - _ReceiveShadows: 1
-    - _SelectedID: 1247
+    - _SelectedID: -1
     - _Shininess: 0
     - _Smoothness: 0.5
     - _SmoothnessSource: 0
@@ -151,7 +151,7 @@ Material:
     - _HighlightColor: {r: 1, g: 0.75, b: 0, a: 0.6}
     - _HoverColor: {r: 0, g: 1, b: 1, a: 0.5}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _UVOffset: {r: 0.8375044, g: 0, b: 0, a: 0}
+    - _UVOffset: {r: 0.043794747, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!114 &8559152120901363900
