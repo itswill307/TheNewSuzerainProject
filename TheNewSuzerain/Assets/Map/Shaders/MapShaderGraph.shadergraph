@@ -1000,7 +1000,7 @@
     "m_Group": {
         "m_Id": ""
     },
-    "m_Name": "PlaneSinusoidalFlat (Custom Function)",
+    "m_Name": "PlaneAitoffFlat (Custom Function)",
     "m_DrawState": {
         "m_Expanded": true,
         "m_Position": {
@@ -1055,7 +1055,7 @@
         "m_SerializableColors": []
     },
     "m_SourceType": 0,
-    "m_FunctionName": "PlaneSinusoidalFlat",
+    "m_FunctionName": "PlaneAitoffFlat",
     "m_FunctionSource": "dcca46c54a9cdf34ea40e6875cd3c171",
     "m_FunctionSourceUsePragmas": true,
     "m_FunctionBody": "Enter function body here..."
