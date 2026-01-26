@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Camera))]
-public class WorldMapController : MonoBehaviour
+public class MapControllerSphere : MonoBehaviour
 {
     [Header("Scene References")]
     [SerializeField] Material  mapMat;      // morph shader material

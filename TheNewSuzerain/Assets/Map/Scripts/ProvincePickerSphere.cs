@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Renderer))]
-public class ProvincePicker : MonoBehaviour
+public class ProvincePickerSphere : MonoBehaviour
 {
     [Header("Refs")]
     public Camera cam;                 // your WorldMapController camera

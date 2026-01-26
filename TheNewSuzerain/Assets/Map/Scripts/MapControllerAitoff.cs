@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Camera))]
-public class WorldMapController_Sinusoidal : MonoBehaviour
+public class MapControllerAitoff : MonoBehaviour
 {
     [Header("Scene References")]
     [SerializeField] Material mapMat;
@@ -25,14 +25,16 @@ public class WorldMapController_Sinusoidal : MonoBehaviour
     float rotateSensitivity = 0.2f;
     [SerializeField, Tooltip("Minimum and maximum pitch (deg) to keep camera right-side up")]
     float minPitchDeg = -80f, maxPitchDeg = 80f;
+    [SerializeField, Tooltip("Minimum and maximum yaw (deg) when rotating (right mouse drag)")]
+    float minYawDeg = -80f, maxYawDeg = 80f;
     [SerializeField, Tooltip("Speed at which camera returns to default when RMB is released (deg/sec)")]
     float returnToDefaultSpeed = 240f;
 
     [Header("Projection Morph")]
-    [SerializeField] float currentMorph = 0f;        // 0=equirectangular, 1=sinusoidal
+    [SerializeField] float currentMorph = 0f;        // 0=equirectangular, 1=projection target
     [SerializeField] bool enableZoomMorph = true;    // enable automatic morph based on zoom level
     [SerializeField, Tooltip("Quadratic morph vs zoom when enabled.")]
-    bool useQuadraticMorph = true;
+    bool useQuadraticMorph = false;
 
     // ---------- private ----------
     Camera cam;
@@ -60,9 +62,7 @@ public class WorldMapController_Sinusoidal : MonoBehaviour
         cam = GetComponent<Camera>();
         input = new InputSystem_Actions();
 
-        // Sinusoidal: width at equator is still 2πR, height is πR.
-        mapWidth = 2f * Mathf.PI * radius;
-        mapHeight = Mathf.PI * radius;
+        UpdateMapDimensions();
 
         CalculateZoomLimits();
 
@@ -94,6 +94,12 @@ public class WorldMapController_Sinusoidal : MonoBehaviour
         baseDistance = horizontalDistance;
         maxZoom = horizontalDistance;
         minZoom = radius * zoomInBuffer;
+    }
+
+    void UpdateMapDimensions()
+    {
+        mapWidth = 4f * radius;
+        mapHeight = 2f * radius;
     }
 
     void PositionCamera()
@@ -241,7 +247,7 @@ public class WorldMapController_Sinusoidal : MonoBehaviour
             {
                 // Fallback to center-lat scaling if UV lookup fails.
                 float cosLat = Mathf.Cos(cameraLat * Mathf.Deg2Rad);
-                float widthFactor = Mathf.Lerp(1f, cosLat, currentMorph);
+                float widthFactor = Mathf.Lerp(1f, cosLat, currentMorph * 0.5f);
                 widthFactor = Mathf.Max(0.01f, widthFactor);
                 float degreesPerPixelX = (worldUnitsPerPixelX / (mapWidth * widthFactor)) * 360f;
 
@@ -256,6 +262,7 @@ public class WorldMapController_Sinusoidal : MonoBehaviour
         {
             orbitYawDeg += rotateDelta.x * rotateSensitivity;
             orbitPitchDeg += rotateDelta.y * rotateSensitivity;
+            orbitYawDeg = Mathf.Clamp(orbitYawDeg, minYawDeg, maxYawDeg);
             orbitPitchDeg = Mathf.Clamp(orbitPitchDeg, minPitchDeg, maxPitchDeg);
         }
         else
@@ -263,6 +270,7 @@ public class WorldMapController_Sinusoidal : MonoBehaviour
             float step = returnToDefaultSpeed * Time.deltaTime;
             orbitYawDeg = Mathf.MoveTowardsAngle(orbitYawDeg, 0f, step);
             orbitPitchDeg = Mathf.MoveTowards(orbitPitchDeg, 0f, step);
+            orbitYawDeg = Mathf.Clamp(orbitYawDeg, minYawDeg, maxYawDeg);
         }
 
         focusLon = Mathf.Repeat(focusLon + panLon, 360f);
@@ -297,8 +305,7 @@ public class WorldMapController_Sinusoidal : MonoBehaviour
     {
         if (Application.isPlaying && cam != null)
         {
-            mapWidth = 2f * Mathf.PI * radius;
-            mapHeight = Mathf.PI * radius;
+            UpdateMapDimensions();
             CalculateZoomLimits();
             currentZoom = Mathf.Clamp(currentZoom, minZoom, maxZoom);
 
@@ -338,16 +345,86 @@ public class WorldMapController_Sinusoidal : MonoBehaviour
 
         Vector3 p = ro + rd * t;
 
-        float lat = p.y / radius; // radians
+        return TryProjectUVFromAitoff(p, out uv);
+    }
+
+    bool TryProjectUVFromAitoff(Vector3 p, out Vector2 uv)
+    {
+        uv = default;
+        if (!TryInverseAitoffBlended(new Vector2(p.x, p.y), currentMorph, out float lat, out float lon))
+        {
+            return false;
+        }
+
         float v = (lat / Mathf.PI) + 0.5f;
         if (v < 0f || v > 1f) return false;
 
-        float scaleX = Mathf.Lerp(1f, Mathf.Cos(lat), currentMorph);
-        scaleX = Mathf.Max(1e-6f, scaleX);
-        float lon = p.x / (radius * scaleX); // radians
         float u = (lon / (2f * Mathf.PI)) + 0.5f;
-
         uv = new Vector2(u - Mathf.Floor(u), v);
         return true;
+    }
+
+    bool TryInverseAitoffBlended(Vector2 targetXY, float morph, out float latitude, out float longitude)
+    {
+        latitude = Mathf.Clamp(targetXY.y / radius, -Mathf.PI * 0.5f, Mathf.PI * 0.5f);
+        longitude = Mathf.Clamp(targetXY.x / radius, -Mathf.PI, Mathf.PI);
+
+        const float eps = 1e-4f;
+        const float tolerance = 1e-4f;
+        for (int i = 0; i < 8; i++)
+        {
+            Vector2 f = ProjectAitoffBlended(latitude, longitude, morph) - targetXY;
+            if (f.sqrMagnitude < tolerance * tolerance)
+            {
+                return true;
+            }
+
+            Vector2 fLatPlus = ProjectAitoffBlended(latitude + eps, longitude, morph);
+            Vector2 fLatMinus = ProjectAitoffBlended(latitude - eps, longitude, morph);
+            Vector2 fLonPlus = ProjectAitoffBlended(latitude, longitude + eps, morph);
+            Vector2 fLonMinus = ProjectAitoffBlended(latitude, longitude - eps, morph);
+
+            Vector2 dF_dLat = (fLatPlus - fLatMinus) * (0.5f / eps);
+            Vector2 dF_dLon = (fLonPlus - fLonMinus) * (0.5f / eps);
+
+            float det = dF_dLat.x * dF_dLon.y - dF_dLat.y * dF_dLon.x;
+            if (Mathf.Abs(det) < 1e-6f)
+            {
+                break;
+            }
+
+            float invDet = 1f / det;
+            float deltaLat = (-f.x * dF_dLon.y + f.y * dF_dLon.x) * invDet;
+            float deltaLon = (-dF_dLat.x * f.y + dF_dLat.y * f.x) * invDet;
+
+            latitude = Mathf.Clamp(latitude + deltaLat, -Mathf.PI * 0.5f, Mathf.PI * 0.5f);
+            longitude = Mathf.Repeat(longitude + deltaLon + Mathf.PI, 2f * Mathf.PI) - Mathf.PI;
+        }
+
+        Vector2 finalError = ProjectAitoffBlended(latitude, longitude, morph) - targetXY;
+        return finalError.sqrMagnitude < tolerance * tolerance;
+    }
+
+    Vector2 ProjectAitoffBlended(float latitude, float longitude, float morph)
+    {
+        Vector2 equirect = new Vector2(longitude * radius, latitude * radius);
+        Vector2 aitoff = ProjectAitoff(latitude, longitude);
+        return Vector2.Lerp(equirect, aitoff, Mathf.Clamp01(morph));
+    }
+
+    Vector2 ProjectAitoff(float latitude, float longitude)
+    {
+        float halfLon = 0.5f * longitude;
+        float cosLat = Mathf.Cos(latitude);
+        float sinLat = Mathf.Sin(latitude);
+        float cosHalfLon = Mathf.Cos(halfLon);
+        float sinHalfLon = Mathf.Sin(halfLon);
+        float alpha = Mathf.Acos(Mathf.Clamp(cosLat * cosHalfLon, -1f, 1f));
+        float sinAlpha = Mathf.Sin(alpha);
+        float invSinc = Mathf.Abs(alpha) < 1e-6f ? 1f : (alpha / sinAlpha);
+
+        float x = 2f * cosLat * sinHalfLon * invSinc * radius;
+        float y = sinLat * invSinc * radius;
+        return new Vector2(x, y);
     }
 }

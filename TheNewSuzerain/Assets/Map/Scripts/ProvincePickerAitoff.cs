@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Renderer))]
-public class ProvincePicker_Sinusoidal : MonoBehaviour
+public class ProvincePickerAitoff : MonoBehaviour
 {
     [Header("Refs")]
     public Camera cam;                 // your WorldMapController camera
@@ -119,27 +119,88 @@ public class ProvincePicker_Sinusoidal : MonoBehaviour
 
         Vector3 p = ro + rd * t;
 
-        // Convert plane position to lat (y) and lon (x), then to UV.
-        // Equirectangular: x = lon * R, y = lat * R
-        // Sinusoidal:      x = lon * R * cos(lat), y = lat * R
-        float lat = p.y / radius;
+        return TryProjectUVFromAitoff(p, out uv);
+    }
+
+    bool TryProjectUVFromAitoff(Vector3 p, out Vector2 uv)
+    {
+        uv = default;
+        float morph = mapMaterial.GetFloat("_Morph"); // 0=equirectangular, 1=aitoff
+        if (!TryInverseAitoffBlended(new Vector2(p.x, p.y), morph, out float lat, out float lon))
+        {
+            return false;
+        }
+
         float v = (lat / Mathf.PI) + 0.5f;
         if (v < 0f || v > 1f) return false;
 
-        float morph = mapMaterial.GetFloat("_Morph"); // 0=equirectangular, 1=sinusoidal
-        float widthFactor = Mathf.Lerp(1f, Mathf.Cos(lat), morph);
-        if (widthFactor < 1e-6f)
-        {
-            if (Mathf.Abs(p.x) > 1e-4f) return false;
-            widthFactor = 1f;
-        }
-
-        float lon = p.x / (radius * widthFactor);
         float u = (lon / (2f * Mathf.PI)) + 0.5f;
-        if (u < 0f || u > 1f) return false;
-
         uv = new Vector2(u, v);
         return true;
+    }
+
+    bool TryInverseAitoffBlended(Vector2 targetXY, float morph, out float latitude, out float longitude)
+    {
+        latitude = Mathf.Clamp(targetXY.y / radius, -Mathf.PI * 0.5f, Mathf.PI * 0.5f);
+        longitude = Mathf.Clamp(targetXY.x / radius, -Mathf.PI, Mathf.PI);
+
+        const float eps = 1e-4f;
+        const float tolerance = 1e-4f;
+        for (int i = 0; i < 8; i++)
+        {
+            Vector2 f = ProjectAitoffBlended(latitude, longitude, morph) - targetXY;
+            if (f.sqrMagnitude < tolerance * tolerance)
+            {
+                return true;
+            }
+
+            Vector2 fLatPlus = ProjectAitoffBlended(latitude + eps, longitude, morph);
+            Vector2 fLatMinus = ProjectAitoffBlended(latitude - eps, longitude, morph);
+            Vector2 fLonPlus = ProjectAitoffBlended(latitude, longitude + eps, morph);
+            Vector2 fLonMinus = ProjectAitoffBlended(latitude, longitude - eps, morph);
+
+            Vector2 dF_dLat = (fLatPlus - fLatMinus) * (0.5f / eps);
+            Vector2 dF_dLon = (fLonPlus - fLonMinus) * (0.5f / eps);
+
+            float det = dF_dLat.x * dF_dLon.y - dF_dLat.y * dF_dLon.x;
+            if (Mathf.Abs(det) < 1e-6f)
+            {
+                break;
+            }
+
+            float invDet = 1f / det;
+            float deltaLat = (-f.x * dF_dLon.y + f.y * dF_dLon.x) * invDet;
+            float deltaLon = (-dF_dLat.x * f.y + dF_dLat.y * f.x) * invDet;
+
+            latitude = Mathf.Clamp(latitude + deltaLat, -Mathf.PI * 0.5f, Mathf.PI * 0.5f);
+            longitude = Mathf.Repeat(longitude + deltaLon + Mathf.PI, 2f * Mathf.PI) - Mathf.PI;
+        }
+
+        Vector2 finalError = ProjectAitoffBlended(latitude, longitude, morph) - targetXY;
+        return finalError.sqrMagnitude < tolerance * tolerance;
+    }
+
+    Vector2 ProjectAitoffBlended(float latitude, float longitude, float morph)
+    {
+        Vector2 equirect = new Vector2(longitude * radius, latitude * radius);
+        Vector2 aitoff = ProjectAitoff(latitude, longitude);
+        return Vector2.Lerp(equirect, aitoff, Mathf.Clamp01(morph));
+    }
+
+    Vector2 ProjectAitoff(float latitude, float longitude)
+    {
+        float halfLon = 0.5f * longitude;
+        float cosLat = Mathf.Cos(latitude);
+        float sinLat = Mathf.Sin(latitude);
+        float cosHalfLon = Mathf.Cos(halfLon);
+        float sinHalfLon = Mathf.Sin(halfLon);
+        float alpha = Mathf.Acos(Mathf.Clamp(cosLat * cosHalfLon, -1f, 1f));
+        float sinAlpha = Mathf.Sin(alpha);
+        float invSinc = Mathf.Abs(alpha) < 1e-6f ? 1f : (alpha / sinAlpha);
+
+        float x = 2f * cosLat * sinHalfLon * invSinc * radius;
+        float y = sinLat * invSinc * radius;
+        return new Vector2(x, y);
     }
 
     int SampleProvinceId(float u, float v)
