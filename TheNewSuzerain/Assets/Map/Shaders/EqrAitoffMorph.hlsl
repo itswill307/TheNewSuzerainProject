@@ -3,6 +3,8 @@
 #define EQR_AITOFF_MORPH_HLSL
 
 static const float PI_ = 3.14159265359;
+// Winkel Tripel standard parallel: cos(phi1) = 2/pi
+static const float COS_PHI1_ = 2.0 / PI_;
 
 // Shader Graph Custom Function (File):
 //   Name:     PlaneAitoffFlat
@@ -27,7 +29,7 @@ void EqrAitoffMorph_float(
     float latitude = (UV.y - 0.5) * PI_;
 
     float3 equirectPos = float3(
-        longitude * Radius,
+        longitude * Radius * COS_PHI1_,
         latitude * Radius,
         0.0
     );

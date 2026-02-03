@@ -182,7 +182,8 @@ public class ProvincePickerAitoff : MonoBehaviour
 
     Vector2 ProjectAitoffBlended(float latitude, float longitude, float morph)
     {
-        Vector2 equirect = new Vector2(longitude * radius, latitude * radius);
+        float cosPhi1 = 2f / Mathf.PI; // Winkel Tripel standard parallel
+        Vector2 equirect = new Vector2(longitude * radius * cosPhi1, latitude * radius);
         Vector2 aitoff = ProjectAitoff(latitude, longitude);
         return Vector2.Lerp(equirect, aitoff, Mathf.Clamp01(morph));
     }

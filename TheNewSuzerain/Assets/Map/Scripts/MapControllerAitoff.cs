@@ -14,7 +14,6 @@ public class MapControllerAitoff : MonoBehaviour
     [Header("Zoom")]
     [SerializeField] float zoomSpeed = 6f;
     [SerializeField] float zoomInBuffer = 0.01f;
-    [SerializeField] bool useRendererBoundsForZoom = true; // fit actual mesh width at startup
 
     [Header("Panning")]
     [SerializeField] float panKeySpeed = 60f;
@@ -83,17 +82,20 @@ public class MapControllerAitoff : MonoBehaviour
         float vFOV = cam.fieldOfView * Mathf.Deg2Rad;
         float hFOV = 2f * Mathf.Atan(Mathf.Tan(vFOV * 0.5f) * cam.aspect);
 
-        float fitWidth = mapWidth;
-        if (useRendererBoundsForZoom && mapRenderer != null)
-        {
-            fitWidth = mapRenderer.bounds.size.x;
-        }
+        // Match the most zoomed-out morph (Winkel Tripel at 0.5).
+        float fitWidth = GetProjectionWidthAtMorph(0.5f);
 
         float horizontalDistance = (fitWidth * 0.5f) / Mathf.Tan(hFOV * 0.5f);
 
         baseDistance = horizontalDistance;
         maxZoom = horizontalDistance;
-        minZoom = radius * zoomInBuffer;
+        float minByBuffer = radius * zoomInBuffer;
+        float nearBuffer = cam.nearClipPlane + (radius * 0.01f);
+        float maxPitchAbs = Mathf.Max(Mathf.Abs(minPitchDeg), Mathf.Abs(maxPitchDeg));
+        float cosMaxPitch = Mathf.Cos(maxPitchAbs * Mathf.Deg2Rad);
+        if (cosMaxPitch < 0.01f) cosMaxPitch = 0.01f;
+        float minByNear = nearBuffer / cosMaxPitch;
+        minZoom = Mathf.Max(minByBuffer, minByNear);
     }
 
     void UpdateMapDimensions()
@@ -192,7 +194,9 @@ public class MapControllerAitoff : MonoBehaviour
     void Update()
     {
         float scroll = input.Map.Zoom.ReadValue<float>();
-        currentZoom = Mathf.Clamp(currentZoom - scroll * zoomSpeed, minZoom, maxZoom);
+        float zoomT = Mathf.InverseLerp(minZoom, maxZoom, currentZoom);
+        float speedScale = Mathf.Lerp(0.2f, 1f, Mathf.Pow(Mathf.Clamp01(zoomT), 1f / 3f));
+        currentZoom = Mathf.Clamp(currentZoom - scroll * zoomSpeed * speedScale, minZoom, maxZoom);
 
         if (mapMat != null)
         {
@@ -204,8 +208,13 @@ public class MapControllerAitoff : MonoBehaviour
                     float normalizedZoom = (maxZoom - currentZoom) / zoomRange;
                     float linear = Mathf.Clamp01(normalizedZoom);
                     float quadratic = linear * linear;
-                    currentMorph = useQuadraticMorph ? quadratic : Mathf.Clamp01(linear);
+                    float t = useQuadraticMorph ? quadratic : Mathf.Clamp01(linear);
+                    currentMorph = Mathf.Lerp(0.5f, 1f, t);
                 }
+            }
+            else
+            {
+                currentMorph = 0.5f;
             }
 
             mapMat.SetFloat("_Morph", currentMorph);
@@ -315,7 +324,12 @@ public class MapControllerAitoff : MonoBehaviour
                 float normalizedZoom = (maxZoom - currentZoom) / zoomRange;
                 float linear = Mathf.Clamp01(normalizedZoom);
                 float quadratic = linear * linear;
-                currentMorph = useQuadraticMorph ? quadratic : Mathf.Clamp01(linear);
+                float t = useQuadraticMorph ? quadratic : Mathf.Clamp01(linear);
+                currentMorph = Mathf.Lerp(0.5f, 1f, t);
+            }
+            else
+            {
+                currentMorph = 0.5f;
             }
 
             if (mapMat != null)
@@ -405,9 +419,16 @@ public class MapControllerAitoff : MonoBehaviour
         return finalError.sqrMagnitude < tolerance * tolerance;
     }
 
+    float GetProjectionWidthAtMorph(float morph)
+    {
+        Vector2 atEdge = ProjectAitoffBlended(0f, Mathf.PI, Mathf.Clamp01(morph));
+        return Mathf.Abs(atEdge.x) * 2f;
+    }
+
     Vector2 ProjectAitoffBlended(float latitude, float longitude, float morph)
     {
-        Vector2 equirect = new Vector2(longitude * radius, latitude * radius);
+        float cosPhi1 = 2f / Mathf.PI; // Winkel Tripel standard parallel
+        Vector2 equirect = new Vector2(longitude * radius * cosPhi1, latitude * radius);
         Vector2 aitoff = ProjectAitoff(latitude, longitude);
         return Vector2.Lerp(equirect, aitoff, Mathf.Clamp01(morph));
     }

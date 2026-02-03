@@ -215,8 +215,8 @@ Camera:
   m_GameObject: {fileID: 101723291}
   m_Enabled: 1
   serializedVersion: 2
-  m_ClearFlags: 1
-  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
+  m_ClearFlags: 2
+  m_BackGroundColor: {r: 0.2, g: 0.2, b: 0.2, a: 1}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -272,17 +272,18 @@ MonoBehaviour:
   mapMat: {fileID: 2100000, guid: 06539798bb9eaa64aa5c164b4d2bdde9, type: 2}
   mapRenderer: {fileID: 1554884630}
   radius: 100
-  zoomSpeed: 6
+  zoomSpeed: 15
   zoomInBuffer: 0.01
-  useRendererBoundsForZoom: 1
   panKeySpeed: 60
   panDragSpeed: 1
   rotateSensitivity: 0.2
   minPitchDeg: -80
   maxPitchDeg: 80
+  minYawDeg: -80
+  maxYawDeg: 80
   returnToDefaultSpeed: 240
   currentMorph: 0
-  enableZoomMorph: 1
+  enableZoomMorph: 0
   useQuadraticMorph: 0
 --- !u!1 &1554884627
 GameObject:
