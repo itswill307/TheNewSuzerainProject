@@ -148,7 +148,7 @@ Transform:
   m_GameObject: {fileID: 101723291}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -1}
+  m_LocalPosition: {x: 0, y: 0, z: -217.93924}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -282,9 +282,10 @@ MonoBehaviour:
   minYawDeg: -80
   maxYawDeg: 80
   returnToDefaultSpeed: 240
-  currentMorph: 0
-  enableZoomMorph: 0
-  useQuadraticMorph: 0
+  currentMorph: 0.5
+  enableZoomMorph: 1
+  useCubicMorph: 1
+  sphereMode: 0
 --- !u!1 &1554884627
 GameObject:
   m_ObjectHideFlags: 0

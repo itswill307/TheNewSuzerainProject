@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Renderer))]
-public class ProvincePickerAitoff : MonoBehaviour
+public class ProvincePickerEqr : MonoBehaviour
 {
     [Header("Refs")]
     public Camera cam;                 // your WorldMapController camera
@@ -63,10 +63,17 @@ public class ProvincePickerAitoff : MonoBehaviour
 
         if (TryGetUVUnderCursor(out Vector2 uv))
         {
+            float sphereFlag = mapMaterial.GetFloat("_Sphere");
+
             // Apply the same sampling offset as your shader (horizontal repeat)
             Vector2 uvOffset = mapMaterial.GetVector("_UVOffset"); // focusLon/360
-            float u = uv.x + uvOffset.x;
-            float v = uv.y + uvOffset.y; // you keep Y = 0; still safe
+            float u = uv.x;
+            float v = uv.y;
+            if (sphereFlag <= 0.5f)
+            {
+                u += uvOffset.x;
+                v += uvOffset.y; // you keep Y = 0; still safe
+            }
             u = u - Mathf.Floor(u);      // repeat X
             v = Mathf.Clamp01(v);        // clamp Y
 
@@ -110,6 +117,28 @@ public class ProvincePickerAitoff : MonoBehaviour
         Transform tr = rend.transform;
         Vector3 ro = tr.InverseTransformPoint(sRay.origin);
         Vector3 rd = tr.InverseTransformDirection(sRay.direction).normalized;
+
+        float sphereFlag = mapMaterial.GetFloat("_Sphere");
+        if (sphereFlag > 0.5f)
+        {
+            // Ray-sphere intersection in object space (sphere centered at origin).
+            float bTerm = Vector3.Dot(ro, rd);
+            float cTerm = Vector3.Dot(ro, ro) - radius * radius;
+            float discriminant = bTerm * bTerm - cTerm;
+            if (discriminant < 0f) return false;
+            float hitDistance = -bTerm - Mathf.Sqrt(discriminant);
+            if (hitDistance <= 0f) hitDistance = -bTerm + Mathf.Sqrt(discriminant);
+            if (hitDistance <= 0f) return false;
+
+            Vector3 hitPoint = ro + rd * hitDistance;
+            float lon = Mathf.Atan2(hitPoint.z, hitPoint.x);
+            float lat = Mathf.Asin(Mathf.Clamp(hitPoint.y / radius, -1f, 1f));
+
+            float u = (lon / (2f * Mathf.PI)) + 0.5f;
+            float v = (lat / Mathf.PI) + 0.5f;
+            uv = new Vector2(u, v);
+            return true;
+        }
 
         // Intersect plane z=0
         const float EPS = 1e-6f;

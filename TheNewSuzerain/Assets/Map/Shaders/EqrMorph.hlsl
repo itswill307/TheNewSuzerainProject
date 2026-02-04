@@ -13,7 +13,7 @@ static const float COS_PHI1_ = 2.0 / PI_;
 //             HeightTex (Texture2D), HeightSampler (SamplerState)
 //             UVOffset (Vector2), HeightScale (Float), HeightBias (Float)
 //   Outputs:  OutPosition (Vector3), OutNormal (Vector3)
-void EqrAitoffMorph_float(
+void EqrMorph_float(
     float2       UV,
     float        Radius,
     float        Morph,

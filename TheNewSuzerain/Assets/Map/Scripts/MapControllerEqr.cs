@@ -2,7 +2,8 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Camera))]
-public class MapControllerAitoff : MonoBehaviour
+[ExecuteAlways]
+public class MapControllerEqr : MonoBehaviour
 {
     [Header("Scene References")]
     [SerializeField] Material mapMat;
@@ -12,7 +13,7 @@ public class MapControllerAitoff : MonoBehaviour
     [SerializeField] float radius = 100f; // must match shader
 
     [Header("Zoom")]
-    [SerializeField] float zoomSpeed = 6f;
+    [SerializeField] float zoomSpeed = 15f;
     [SerializeField] float zoomInBuffer = 0.01f;
 
     [Header("Panning")]
@@ -32,8 +33,14 @@ public class MapControllerAitoff : MonoBehaviour
     [Header("Projection Morph")]
     [SerializeField] float currentMorph = 0f;        // 0=equirectangular, 1=projection target
     [SerializeField] bool enableZoomMorph = true;    // enable automatic morph based on zoom level
-    [SerializeField, Tooltip("Quadratic morph vs zoom when enabled.")]
-    bool useQuadraticMorph = false;
+    [SerializeField, Tooltip("Cubic morph vs zoom when enabled.")]
+    bool useCubicMorph = false;
+
+    [Header("Projection Mode")]
+    [SerializeField, Tooltip("Render the map as a sphere in the shader.")]
+    bool sphereMode = false;
+    [SerializeField, Tooltip("Automatically switch to sphere mode when the sphere fills the camera width.")]
+    bool autoSphereFromZoom = true;
 
     // ---------- private ----------
     Camera cam;
@@ -59,7 +66,10 @@ public class MapControllerAitoff : MonoBehaviour
     void Awake()
     {
         cam = GetComponent<Camera>();
-        input = new InputSystem_Actions();
+        if (input == null)
+        {
+            input = new InputSystem_Actions();
+        }
 
         UpdateMapDimensions();
 
@@ -74,18 +84,36 @@ public class MapControllerAitoff : MonoBehaviour
         SetupFlatMap();
     }
 
-    void OnEnable() => input.Enable();
-    void OnDisable() => input.Disable();
+    void OnEnable()
+    {
+        if (input == null)
+        {
+            input = new InputSystem_Actions();
+        }
+
+        if (Application.isPlaying)
+        {
+            input.Enable();
+        }
+    }
+
+    void OnDisable()
+    {
+        if (input != null && Application.isPlaying)
+        {
+            input.Disable();
+        }
+    }
 
     void CalculateZoomLimits()
     {
-        float vFOV = cam.fieldOfView * Mathf.Deg2Rad;
-        float hFOV = 2f * Mathf.Atan(Mathf.Tan(vFOV * 0.5f) * cam.aspect);
+        float verticalFovRad = cam.fieldOfView * Mathf.Deg2Rad;
+        float horizontalFovRad = 2f * Mathf.Atan(Mathf.Tan(verticalFovRad * 0.5f) * cam.aspect);
 
         // Match the most zoomed-out morph (Winkel Tripel at 0.5).
         float fitWidth = GetProjectionWidthAtMorph(0.5f);
 
-        float horizontalDistance = (fitWidth * 0.5f) / Mathf.Tan(hFOV * 0.5f);
+        float horizontalDistance = (fitWidth * 0.5f) / Mathf.Tan(horizontalFovRad * 0.5f);
 
         baseDistance = horizontalDistance;
         maxZoom = horizontalDistance;
@@ -98,6 +126,16 @@ public class MapControllerAitoff : MonoBehaviour
         minZoom = Mathf.Max(minByBuffer, minByNear);
     }
 
+    float GetSphereSwitchZoom()
+    {
+        if (cam == null) return 0f;
+        float verticalFovRad = cam.fieldOfView * Mathf.Deg2Rad;
+        float horizontalFovRad = 2f * Mathf.Atan(Mathf.Tan(verticalFovRad * 0.5f) * cam.aspect);
+        float sinHalfHfov = Mathf.Sin(horizontalFovRad * 0.5f);
+        if (sinHalfHfov <= 1e-4f) return 0f;
+        return radius * ((1f / sinHalfHfov) - 1f);
+    }
+
     void UpdateMapDimensions()
     {
         mapWidth = 4f * radius;
@@ -106,8 +144,9 @@ public class MapControllerAitoff : MonoBehaviour
 
     void PositionCamera()
     {
-        Vector3 pivot = CalculateSurfacePositionAtLatitude(cameraLat);
-        Vector3 surfaceNormal = CalculateSurfaceNormalAtLatitude(cameraLat);
+        float lonDeg = GetFocusLongitudeDeg();
+        Vector3 pivot = CalculateSurfacePositionAtLatLon(cameraLat, lonDeg);
+        Vector3 surfaceNormal = CalculateSurfaceNormalAtLatLon(cameraLat, lonDeg);
 
         Vector3 offset = surfaceNormal * currentZoom;
 
@@ -131,21 +170,48 @@ public class MapControllerAitoff : MonoBehaviour
         transform.localRotation = Quaternion.LookRotation(forward, Vector3.up);
     }
 
-    Vector3 CalculateSurfacePositionAtLatitude(float latitudeDegrees)
+    float GetFocusLongitudeDeg()
     {
-        float latitudeRad = latitudeDegrees * Mathf.Deg2Rad;
-        return new Vector3(0f, latitudeRad * radius, 0f);
+        return Mathf.DeltaAngle(0f, focusLon);
     }
 
-    Vector3 CalculateSurfaceNormalAtLatitude(float latitudeDegrees)
+    Vector3 CalculateSurfacePositionAtLatLon(float latitudeDegrees, float longitudeDegrees)
     {
-        return Vector3.back;
+        float latitudeRad = latitudeDegrees * Mathf.Deg2Rad;
+        if (!sphereMode)
+        {
+            return new Vector3(0f, latitudeRad * radius, 0f);
+        }
+
+        float longitudeRad = longitudeDegrees * Mathf.Deg2Rad;
+        float cosLat = Mathf.Cos(latitudeRad);
+        float sinLat = Mathf.Sin(latitudeRad);
+        float cosLon = Mathf.Cos(longitudeRad);
+        float sinLon = Mathf.Sin(longitudeRad);
+        return new Vector3(
+            cosLat * cosLon * radius,
+            sinLat * radius,
+            cosLat * sinLon * radius
+        );
+    }
+
+    Vector3 CalculateSurfaceNormalAtLatLon(float latitudeDegrees, float longitudeDegrees)
+    {
+        if (!sphereMode) return Vector3.back;
+
+        Vector3 pos = CalculateSurfacePositionAtLatLon(latitudeDegrees, longitudeDegrees);
+        return pos.sqrMagnitude < 1e-6f ? Vector3.up : pos.normalized;
     }
 
     (float, float) CalculateLatitudeLimitsFromFOV()
     {
-        float vFOV = cam.fieldOfView * Mathf.Deg2Rad;
-        float halfFOV = vFOV * 0.5f;
+        if (sphereMode)
+        {
+            return (-85f, 85f);
+        }
+
+        float verticalFovRad = cam.fieldOfView * Mathf.Deg2Rad;
+        float halfVerticalFov = verticalFovRad * 0.5f;
 
         float minLat = 0f;
         float maxLat = 90f;
@@ -154,14 +220,15 @@ public class MapControllerAitoff : MonoBehaviour
         {
             float testLat = (minLat + maxLat) * 0.5f;
 
-            Vector3 cameraPos = CalculateSurfacePositionAtLatitude(testLat) +
-                               CalculateSurfaceNormalAtLatitude(testLat) * currentZoom;
+            float lonDeg = GetFocusLongitudeDeg();
+            Vector3 cameraPos = CalculateSurfacePositionAtLatLon(testLat, lonDeg) +
+                               CalculateSurfaceNormalAtLatLon(testLat, lonDeg) * currentZoom;
 
-            Vector3 cameraForward = -CalculateSurfaceNormalAtLatitude(testLat);
+            Vector3 cameraForward = -CalculateSurfaceNormalAtLatLon(testLat, lonDeg);
             Vector3 cameraUp = Vector3.up;
             cameraUp = Vector3.Cross(Vector3.Cross(cameraForward, cameraUp), cameraForward).normalized;
 
-            Vector3 northPolePos = CalculateSurfacePositionAtLatitude(90f);
+            Vector3 northPolePos = CalculateSurfacePositionAtLatLon(90f, lonDeg);
             Vector3 toNorthPole = northPolePos - cameraPos;
 
             float forwardDistance = Vector3.Dot(toNorthPole, cameraForward);
@@ -169,7 +236,7 @@ public class MapControllerAitoff : MonoBehaviour
 
             float angleToNorthPole = Mathf.Atan2(upDistance, forwardDistance);
 
-            if (angleToNorthPole >= 0f && angleToNorthPole < halfFOV)
+            if (angleToNorthPole >= 0f && angleToNorthPole < halfVerticalFov)
             {
                 maxLat = testLat;
             }
@@ -193,6 +260,8 @@ public class MapControllerAitoff : MonoBehaviour
 
     void Update()
     {
+        if (!Application.isPlaying) return;
+
         float scroll = input.Map.Zoom.ReadValue<float>();
         float zoomT = Mathf.InverseLerp(minZoom, maxZoom, currentZoom);
         float speedScale = Mathf.Lerp(0.2f, 1f, Mathf.Pow(Mathf.Clamp01(zoomT), 1f / 3f));
@@ -200,6 +269,12 @@ public class MapControllerAitoff : MonoBehaviour
 
         if (mapMat != null)
         {
+            if (autoSphereFromZoom)
+            {
+                float switchZoom = GetSphereSwitchZoom();
+                sphereMode = currentZoom <= switchZoom;
+            }
+
             if (enableZoomMorph)
             {
                 float zoomRange = maxZoom - minZoom;
@@ -207,8 +282,8 @@ public class MapControllerAitoff : MonoBehaviour
                 {
                     float normalizedZoom = (maxZoom - currentZoom) / zoomRange;
                     float linear = Mathf.Clamp01(normalizedZoom);
-                    float quadratic = linear * linear;
-                    float t = useQuadraticMorph ? quadratic : Mathf.Clamp01(linear);
+                    float cubic = linear * linear * linear;
+                    float t = useCubicMorph ? cubic : Mathf.Clamp01(linear);
                     currentMorph = Mathf.Lerp(0.5f, 1f, t);
                 }
             }
@@ -218,16 +293,17 @@ public class MapControllerAitoff : MonoBehaviour
             }
 
             mapMat.SetFloat("_Morph", currentMorph);
+            mapMat.SetFloat("_Sphere", sphereMode ? 1f : 0f);
         }
 
         Vector2 moveKeys = input.Map.Move.ReadValue<Vector2>();
         Vector2 dragPan = input.Map.DragPan.ReadValue<Vector2>();
         Vector2 cursorPos = input.Map.Point.ReadValue<Vector2>();
 
-        float vFOV = cam.fieldOfView * Mathf.Deg2Rad;
-        float hFOV = 2f * Mathf.Atan(Mathf.Tan(vFOV * 0.5f) * cam.aspect);
-        float worldUnitsPerPixelX = (2f * currentZoom * Mathf.Tan(hFOV * 0.5f)) / Screen.width;
-        float worldUnitsPerPixelY = (2f * currentZoom * Mathf.Tan(vFOV * 0.5f)) / Screen.height;
+        float verticalFovRad = cam.fieldOfView * Mathf.Deg2Rad;
+        float horizontalFovRad = 2f * Mathf.Atan(Mathf.Tan(verticalFovRad * 0.5f) * cam.aspect);
+        float worldUnitsPerPixelX = (2f * currentZoom * Mathf.Tan(horizontalFovRad * 0.5f)) / Screen.width;
+        float worldUnitsPerPixelY = (2f * currentZoom * Mathf.Tan(verticalFovRad * 0.5f)) / Screen.height;
 
         float degreesPerPixelY = (worldUnitsPerPixelY / mapHeight) * 180f;
 
@@ -312,31 +388,55 @@ public class MapControllerAitoff : MonoBehaviour
 
     void OnValidate()
     {
-        if (Application.isPlaying && cam != null)
+        if (cam == null)
         {
-            UpdateMapDimensions();
+            cam = GetComponent<Camera>();
+        }
+
+        UpdateMapDimensions();
+        if (cam != null)
+        {
             CalculateZoomLimits();
+        }
+
+        if (currentZoom <= 0f || !Application.isPlaying)
+        {
+            currentZoom = baseDistance;
+        }
+
+        if (maxZoom > minZoom)
+        {
             currentZoom = Mathf.Clamp(currentZoom, minZoom, maxZoom);
+        }
 
-            if (enableZoomMorph && maxZoom > minZoom)
+        if (enableZoomMorph && maxZoom > minZoom)
+        {
+            float zoomRange = maxZoom - minZoom;
+            float normalizedZoom = (maxZoom - currentZoom) / zoomRange;
+            float linear = Mathf.Clamp01(normalizedZoom);
+            float cubic = linear * linear * linear;
+            float t = useCubicMorph ? cubic : Mathf.Clamp01(linear);
+            currentMorph = Mathf.Lerp(0.5f, 1f, t);
+        }
+        else
+        {
+            currentMorph = 0.5f;
+        }
+
+        if (mapMat != null)
+        {
+            if (autoSphereFromZoom)
             {
-                float zoomRange = maxZoom - minZoom;
-                float normalizedZoom = (maxZoom - currentZoom) / zoomRange;
-                float linear = Mathf.Clamp01(normalizedZoom);
-                float quadratic = linear * linear;
-                float t = useQuadraticMorph ? quadratic : Mathf.Clamp01(linear);
-                currentMorph = Mathf.Lerp(0.5f, 1f, t);
-            }
-            else
-            {
-                currentMorph = 0.5f;
+                float switchZoom = GetSphereSwitchZoom();
+                sphereMode = currentZoom <= switchZoom;
             }
 
-            if (mapMat != null)
-            {
-                mapMat.SetFloat("_Morph", currentMorph);
-            }
+            mapMat.SetFloat("_Morph", currentMorph);
+            mapMat.SetFloat("_Sphere", sphereMode ? 1f : 0f);
+        }
 
+        if (cam != null)
+        {
             PositionCamera();
             UpdateUVOffset();
         }
@@ -347,25 +447,46 @@ public class MapControllerAitoff : MonoBehaviour
         uv = default;
         if (mapRenderer == null || cam == null) return false;
 
-        Ray sRay = cam.ScreenPointToRay(new Vector3(screenPos.x, screenPos.y, 0f));
-        Transform tr = mapRenderer.transform;
-        Vector3 ro = tr.InverseTransformPoint(sRay.origin);
-        Vector3 rd = tr.InverseTransformDirection(sRay.direction).normalized;
+        Ray screenRay = cam.ScreenPointToRay(new Vector3(screenPos.x, screenPos.y, 0f));
+        Transform rendererTransform = mapRenderer.transform;
+        Vector3 rayOriginOS = rendererTransform.InverseTransformPoint(screenRay.origin);
+        Vector3 rayDirOS = rendererTransform.InverseTransformDirection(screenRay.direction).normalized;
+
+        if (sphereMode)
+        {
+            // Ray-sphere intersection in object space (sphere centered at origin).
+            float bTerm = Vector3.Dot(rayOriginOS, rayDirOS);
+            float cTerm = Vector3.Dot(rayOriginOS, rayOriginOS) - radius * radius;
+            float discriminant = bTerm * bTerm - cTerm;
+            if (discriminant < 0f) return false;
+            float sphereHitDistance = -bTerm - Mathf.Sqrt(discriminant);
+            if (sphereHitDistance <= 0f) sphereHitDistance = -bTerm + Mathf.Sqrt(discriminant);
+            if (sphereHitDistance <= 0f) return false;
+
+            Vector3 sphereHitPoint = rayOriginOS + rayDirOS * sphereHitDistance;
+            float lon = Mathf.Atan2(sphereHitPoint.z, sphereHitPoint.x);
+            float lat = Mathf.Asin(Mathf.Clamp(sphereHitPoint.y / radius, -1f, 1f));
+
+            float u = (lon / (2f * Mathf.PI)) + 0.5f;
+            float v = (lat / Mathf.PI) + 0.5f;
+            uv = new Vector2(u - Mathf.Floor(u), v);
+            return true;
+        }
 
         const float EPS = 1e-6f;
-        if (Mathf.Abs(rd.z) < EPS) return false;
-        float t = -ro.z / rd.z;
-        if (t <= 0f) return false;
+        if (Mathf.Abs(rayDirOS.z) < EPS) return false;
+        float planeHitDistance = -rayOriginOS.z / rayDirOS.z;
+        if (planeHitDistance <= 0f) return false;
 
-        Vector3 p = ro + rd * t;
+        Vector3 planeHitPoint = rayOriginOS + rayDirOS * planeHitDistance;
 
-        return TryProjectUVFromAitoff(p, out uv);
+        return TryProjectUVFromAitoff(planeHitPoint, out uv);
     }
 
-    bool TryProjectUVFromAitoff(Vector3 p, out Vector2 uv)
+    bool TryProjectUVFromAitoff(Vector3 projectedPoint, out Vector2 uv)
     {
         uv = default;
-        if (!TryInverseAitoffBlended(new Vector2(p.x, p.y), currentMorph, out float lat, out float lon))
+        if (!TryInverseAitoffBlended(new Vector2(projectedPoint.x, projectedPoint.y), currentMorph, out float lat, out float lon))
         {
             return false;
         }
@@ -383,40 +504,40 @@ public class MapControllerAitoff : MonoBehaviour
         latitude = Mathf.Clamp(targetXY.y / radius, -Mathf.PI * 0.5f, Mathf.PI * 0.5f);
         longitude = Mathf.Clamp(targetXY.x / radius, -Mathf.PI, Mathf.PI);
 
-        const float eps = 1e-4f;
+        const float stepEps = 1e-4f;
         const float tolerance = 1e-4f;
         for (int i = 0; i < 8; i++)
         {
-            Vector2 f = ProjectAitoffBlended(latitude, longitude, morph) - targetXY;
-            if (f.sqrMagnitude < tolerance * tolerance)
+            Vector2 residual = ProjectAitoffBlended(latitude, longitude, morph) - targetXY;
+            if (residual.sqrMagnitude < tolerance * tolerance)
             {
                 return true;
             }
 
-            Vector2 fLatPlus = ProjectAitoffBlended(latitude + eps, longitude, morph);
-            Vector2 fLatMinus = ProjectAitoffBlended(latitude - eps, longitude, morph);
-            Vector2 fLonPlus = ProjectAitoffBlended(latitude, longitude + eps, morph);
-            Vector2 fLonMinus = ProjectAitoffBlended(latitude, longitude - eps, morph);
+            Vector2 residualLatPlus = ProjectAitoffBlended(latitude + stepEps, longitude, morph);
+            Vector2 residualLatMinus = ProjectAitoffBlended(latitude - stepEps, longitude, morph);
+            Vector2 residualLonPlus = ProjectAitoffBlended(latitude, longitude + stepEps, morph);
+            Vector2 residualLonMinus = ProjectAitoffBlended(latitude, longitude - stepEps, morph);
 
-            Vector2 dF_dLat = (fLatPlus - fLatMinus) * (0.5f / eps);
-            Vector2 dF_dLon = (fLonPlus - fLonMinus) * (0.5f / eps);
+            Vector2 dResidual_dLat = (residualLatPlus - residualLatMinus) * (0.5f / stepEps);
+            Vector2 dResidual_dLon = (residualLonPlus - residualLonMinus) * (0.5f / stepEps);
 
-            float det = dF_dLat.x * dF_dLon.y - dF_dLat.y * dF_dLon.x;
-            if (Mathf.Abs(det) < 1e-6f)
+            float determinant = dResidual_dLat.x * dResidual_dLon.y - dResidual_dLat.y * dResidual_dLon.x;
+            if (Mathf.Abs(determinant) < 1e-6f)
             {
                 break;
             }
 
-            float invDet = 1f / det;
-            float deltaLat = (-f.x * dF_dLon.y + f.y * dF_dLon.x) * invDet;
-            float deltaLon = (-dF_dLat.x * f.y + dF_dLat.y * f.x) * invDet;
+            float invDeterminant = 1f / determinant;
+            float deltaLatitude = (-residual.x * dResidual_dLon.y + residual.y * dResidual_dLon.x) * invDeterminant;
+            float deltaLongitude = (-dResidual_dLat.x * residual.y + dResidual_dLat.y * residual.x) * invDeterminant;
 
-            latitude = Mathf.Clamp(latitude + deltaLat, -Mathf.PI * 0.5f, Mathf.PI * 0.5f);
-            longitude = Mathf.Repeat(longitude + deltaLon + Mathf.PI, 2f * Mathf.PI) - Mathf.PI;
+            latitude = Mathf.Clamp(latitude + deltaLatitude, -Mathf.PI * 0.5f, Mathf.PI * 0.5f);
+            longitude = Mathf.Repeat(longitude + deltaLongitude + Mathf.PI, 2f * Mathf.PI) - Mathf.PI;
         }
 
-        Vector2 finalError = ProjectAitoffBlended(latitude, longitude, morph) - targetXY;
-        return finalError.sqrMagnitude < tolerance * tolerance;
+        Vector2 finalResidual = ProjectAitoffBlended(latitude, longitude, morph) - targetXY;
+        return finalResidual.sqrMagnitude < tolerance * tolerance;
     }
 
     float GetProjectionWidthAtMorph(float morph)
@@ -427,25 +548,25 @@ public class MapControllerAitoff : MonoBehaviour
 
     Vector2 ProjectAitoffBlended(float latitude, float longitude, float morph)
     {
-        float cosPhi1 = 2f / Mathf.PI; // Winkel Tripel standard parallel
-        Vector2 equirect = new Vector2(longitude * radius * cosPhi1, latitude * radius);
-        Vector2 aitoff = ProjectAitoff(latitude, longitude);
-        return Vector2.Lerp(equirect, aitoff, Mathf.Clamp01(morph));
+        float cosStandardParallel = 2f / Mathf.PI; // Winkel Tripel standard parallel
+        Vector2 equirectangular = new Vector2(longitude * radius * cosStandardParallel, latitude * radius);
+        Vector2 aitoffProjected = ProjectAitoff(latitude, longitude);
+        return Vector2.Lerp(equirectangular, aitoffProjected, Mathf.Clamp01(morph));
     }
 
     Vector2 ProjectAitoff(float latitude, float longitude)
     {
-        float halfLon = 0.5f * longitude;
-        float cosLat = Mathf.Cos(latitude);
-        float sinLat = Mathf.Sin(latitude);
-        float cosHalfLon = Mathf.Cos(halfLon);
-        float sinHalfLon = Mathf.Sin(halfLon);
-        float alpha = Mathf.Acos(Mathf.Clamp(cosLat * cosHalfLon, -1f, 1f));
-        float sinAlpha = Mathf.Sin(alpha);
-        float invSinc = Mathf.Abs(alpha) < 1e-6f ? 1f : (alpha / sinAlpha);
+        float halfLongitude = 0.5f * longitude;
+        float cosLatitude = Mathf.Cos(latitude);
+        float sinLatitude = Mathf.Sin(latitude);
+        float cosHalfLongitude = Mathf.Cos(halfLongitude);
+        float sinHalfLongitude = Mathf.Sin(halfLongitude);
+        float alphaAngle = Mathf.Acos(Mathf.Clamp(cosLatitude * cosHalfLongitude, -1f, 1f));
+        float sinAlpha = Mathf.Sin(alphaAngle);
+        float invSincAlpha = Mathf.Abs(alphaAngle) < 1e-6f ? 1f : (alphaAngle / sinAlpha);
 
-        float x = 2f * cosLat * sinHalfLon * invSinc * radius;
-        float y = sinLat * invSinc * radius;
+        float x = 2f * cosLatitude * sinHalfLongitude * invSincAlpha * radius;
+        float y = sinLatitude * invSincAlpha * radius;
         return new Vector2(x, y);
     }
 }

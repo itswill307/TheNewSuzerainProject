@@ -1000,7 +1000,7 @@
     "m_Group": {
         "m_Id": ""
     },
-    "m_Name": "EqrAitoffMorph (Custom Function)",
+    "m_Name": "EqrMorph (Custom Function)",
     "m_DrawState": {
         "m_Expanded": true,
         "m_Position": {
@@ -1055,7 +1055,7 @@
         "m_SerializableColors": []
     },
     "m_SourceType": 0,
-    "m_FunctionName": "EqrAitoffMorph",
+    "m_FunctionName": "EqrMorph",
     "m_FunctionSource": "d8cf0a66a416ef14d96b354e01374af2",
     "m_FunctionSourceUsePragmas": true,
     "m_FunctionBody": "Enter function body here..."
