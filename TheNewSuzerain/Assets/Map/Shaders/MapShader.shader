@@ -14,9 +14,11 @@ Shader "Map/MapShader"
         [Toggle] _Sphere ("Sphere Mode", Float) = 0
 
         [Header(Height)]
-        _HeightScale ("Height Scale", Float) = 1
         _HeightBias ("Height Bias", Float) = 0
-        _HeightLOD ("Height LOD", Float) = 0
+        _HeightMinKm ("Height Min (km)", Float) = -10.994
+        _HeightMaxKm ("Height Max (km)", Float) = 8.849
+        _HeightExaggeration ("Height Exaggeration", Float) = 1
+        _KmPerUnit ("Km Per Unit", Float) = 1
 
         [Header(Selection)]
         _SelectedID ("Selected ID", Float) = -1
@@ -39,7 +41,7 @@ Shader "Map/MapShader"
 
         Pass
         {
-            Name "ForwardUnlit"
+            Name "ForwardLit"
             Tags { "LightMode" = "UniversalForward" }
 
             HLSLPROGRAM
@@ -48,6 +50,7 @@ Shader "Map/MapShader"
             #pragma target 3.0
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
@@ -57,6 +60,7 @@ Shader "Map/MapShader"
 
             TEXTURE2D(_HeightTex);
             SAMPLER(sampler_HeightTex);
+            float4 _HeightTex_TexelSize;
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
@@ -65,9 +69,11 @@ Shader "Map/MapShader"
                 float2 _UVOffset;
                 float _Radius;
                 float _Morph;
-                float _HeightScale;
                 float _HeightBias;
-                float _HeightLOD;
+                float _HeightMinKm;
+                float _HeightMaxKm;
+                float _HeightExaggeration;
+                float _KmPerUnit;
                 float _SelectedID;
                 float _HoverID;
                 float _Sphere;
@@ -76,7 +82,6 @@ Shader "Map/MapShader"
             static const float PI_ = 3.14159265359;
             static const float COS_PHI1_ = 2.0 / PI_;
 
-            // Province RGB decode helpers (inlined from ProvinceRGBDecode.hlsl)
             inline uint DecodeProvinceId24(float3 rgb)
             {
                 float3 rgb255 = round(saturate(rgb) * 255.0);
@@ -86,30 +91,13 @@ Shader "Map/MapShader"
                 return (r8 | (g8 << 8) | (b8 << 16));
             }
 
-            void ProvinceIdFromRGB_float(float3 idRGB, out float idOut)
-            {
-                idOut = (float)DecodeProvinceId24(idRGB);
-            }
-
             void ProvinceIdMaskFromRGB_float(float3 idRGB, float selectedId, out float mask, out float idOut)
             {
                 uint provinceId = DecodeProvinceId24(idRGB);
                 idOut = (float)provinceId;
-                // Gate: if selectedId < 0, disable the mask entirely
                 float maskEnabled = step(0.0, selectedId + 0.5);
-                // Avoid wrap when converting negative float to uint
                 uint selectedIdInt = (uint)max(0.0, round(selectedId));
                 mask = maskEnabled * ((provinceId == selectedIdInt) ? 1.0 : 0.0);
-            }
-
-            void ProvinceHighlightFromRGB_float(
-                float3 idRGB, float selectedId, float4 highlightColor,
-                float3 baseColor, out float3 outColor)
-            {
-                float selectMask, decodedId;
-                ProvinceIdMaskFromRGB_float(idRGB, selectedId, selectMask, decodedId);
-                float3 tint = highlightColor.rgb * highlightColor.a;
-                outColor = lerp(baseColor, baseColor + tint, selectMask);
             }
 
             void ProvinceHoverSelectFromRGB_float(
@@ -122,7 +110,6 @@ Shader "Map/MapShader"
 
                 float hoverMask, hoverIdDecoded;
                 ProvinceIdMaskFromRGB_float(idRGB, hoverId, hoverMask, hoverIdDecoded);
-                // Ensure hover cannot apply when hoverId is negative (e.g. -1 sentinel from CPU)
                 float hoverEnabled = step(0.0, hoverId + 0.5);
                 hoverMask *= hoverEnabled;
 
@@ -132,7 +119,7 @@ Shader "Map/MapShader"
                 outColor = color;
             }
 
-            void EqrMorph_float(
+            float3 EvaluateDisplacedPosition(
                 float2 UV,
                 float Radius,
                 float Morph,
@@ -140,19 +127,21 @@ Shader "Map/MapShader"
                 Texture2D HeightTex,
                 SamplerState HeightSampler,
                 float2 UVOffset,
-                float HeightScale,
-                float HeightBias,
-                out float3 OutPosition,
-                out float3 OutNormal)
+                float HeightMinKm,
+                float HeightMaxKm,
+                float HeightExaggeration,
+                float KmPerUnit)
             {
-                float2 geometryUV = UV;
-                if (Sphere > 0.5)
-                {
-                    geometryUV = float2(
-                        frac(UV.x + UVOffset.x),
-                        saturate(UV.y + UVOffset.y)
-                    );
-                }
+                float sphereLerp = saturate(Sphere);
+                float2 planarPannedUV = float2(
+                    frac(UV.x + UVOffset.x),
+                    saturate(UV.y + UVOffset.y)
+                );
+                float2 sphereUV = float2(
+                    UV.x,
+                    saturate(UV.y)
+                );
+                float2 geometryUV = lerp(UV, sphereUV, sphereLerp);
 
                 float longitude = (geometryUV.x - 0.5) * (2.0 * PI_);
                 float latitude = (geometryUV.y - 0.5) * PI_;
@@ -176,15 +165,11 @@ Shader "Map/MapShader"
                     2.0 * cosLatitude * sinHalfLongitude * invSincAlpha,
                     sinLatitude * invSincAlpha
                 );
-
                 float3 aitoffPos = float3(aitoffXY * Radius, 0.0);
-
                 float3 basePos = lerp(equirectangularPos, aitoffPos, saturate(Morph));
 
-                // Aitoff is planar; its geometric normal stays constant.
                 float3 planeNormalGeom = float3(0.0, 0.0, 1.0);
 
-                // Sphere position/normal from lat/lon (Y up).
                 float cosLatitudeSphere = cos(latitude);
                 float sinLatitudeSphere = sin(latitude);
                 float cosLongitudeSphere = cos(longitude);
@@ -196,22 +181,106 @@ Shader "Map/MapShader"
                 );
                 float3 sphereNormal = normalize(spherePosition);
 
-                float2 heightSampleUV = float2(
-                    frac(UV.x + UVOffset.x),
-                    saturate(UV.y + UVOffset.y)
-                );
+                float2 heightSampleUV = lerp(planarPannedUV, sphereUV, sphereLerp);
                 float heightSample01 = HeightTex.SampleLevel(HeightSampler, heightSampleUV, 0).r;
-                float heightWorldUnits = (heightSample01 - HeightBias) * HeightScale;
+                float elevationKm = lerp(HeightMinKm, HeightMaxKm, heightSample01);
+                float heightWorldUnits = (elevationKm / max(1e-6, KmPerUnit)) * HeightExaggeration;
 
                 float3 planePosition = basePos + (-planeNormalGeom) * heightWorldUnits;
-                float3 planeNormal = -planeNormalGeom;
-
                 float3 spherePositionWithHeight = spherePosition + sphereNormal * heightWorldUnits;
-                float3 sphereNormalWithHeight = sphereNormal;
+                return lerp(planePosition, spherePositionWithHeight, sphereLerp);
+            }
+
+            void EqrMorph_float(
+                float2 UV,
+                float Radius,
+                float Morph,
+                float Sphere,
+                Texture2D HeightTex,
+                SamplerState HeightSampler,
+                float2 UVOffset,
+                float HeightMinKm,
+                float HeightMaxKm,
+                float HeightExaggeration,
+                float KmPerUnit,
+                out float3 OutPosition,
+                out float3 OutNormal)
+            {
+                OutPosition = EvaluateDisplacedPosition(
+                    UV,
+                    Radius,
+                    Morph,
+                    Sphere,
+                    HeightTex,
+                    HeightSampler,
+                    UVOffset,
+                    HeightMinKm,
+                    HeightMaxKm,
+                    HeightExaggeration,
+                    KmPerUnit
+                );
 
                 float sphereLerp = saturate(Sphere);
-                OutPosition = lerp(planePosition, spherePositionWithHeight, sphereLerp);
-                OutNormal = normalize(lerp(planeNormal, sphereNormalWithHeight, sphereLerp));
+                float2 sphereUV = float2(UV.x, saturate(UV.y));
+                float2 geometryUV = lerp(UV, sphereUV, sphereLerp);
+
+                float longitude = (geometryUV.x - 0.5) * (2.0 * PI_);
+                float latitude = (geometryUV.y - 0.5) * PI_;
+                float cosLatitudeSphere = cos(latitude);
+                float sinLatitudeSphere = sin(latitude);
+                float cosLongitudeSphere = cos(longitude);
+                float sinLongitudeSphere = sin(longitude);
+
+                float3 planeNormal = float3(0.0, 0.0, -1.0);
+                float3 sphereNormal = normalize(float3(
+                    cosLatitudeSphere * cosLongitudeSphere,
+                    sinLatitudeSphere,
+                    cosLatitudeSphere * sinLongitudeSphere
+                ));
+                float3 fallbackNormal = normalize(lerp(planeNormal, sphereNormal, sphereLerp));
+
+                float2 texelStep = float2(
+                    max(1e-6, _HeightTex_TexelSize.x),
+                    max(1e-6, _HeightTex_TexelSize.y)
+                );
+                float2 uvDx = float2(frac(UV.x + texelStep.x), UV.y);
+                float2 uvDy = float2(UV.x, saturate(UV.y + texelStep.y));
+
+                float3 posDx = EvaluateDisplacedPosition(
+                    uvDx,
+                    Radius,
+                    Morph,
+                    Sphere,
+                    HeightTex,
+                    HeightSampler,
+                    UVOffset,
+                    HeightMinKm,
+                    HeightMaxKm,
+                    HeightExaggeration,
+                    KmPerUnit
+                );
+                float3 posDy = EvaluateDisplacedPosition(
+                    uvDy,
+                    Radius,
+                    Morph,
+                    Sphere,
+                    HeightTex,
+                    HeightSampler,
+                    UVOffset,
+                    HeightMinKm,
+                    HeightMaxKm,
+                    HeightExaggeration,
+                    KmPerUnit
+                );
+
+                float3 normal = normalize(cross(posDy - OutPosition, posDx - OutPosition));
+                if (dot(normal, fallbackNormal) < 0.0)
+                {
+                    normal = -normal;
+                }
+
+                float normalLenSq = dot(normal, normal);
+                OutNormal = normalLenSq > 1e-8 ? normal : fallbackNormal;
             }
 
             struct Attributes
@@ -225,6 +294,7 @@ Shader "Map/MapShader"
             {
                 float4 positionCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
+                float3 normalWS : TEXCOORD1;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -246,14 +316,17 @@ Shader "Map/MapShader"
                     _HeightTex,
                     sampler_HeightTex,
                     _UVOffset,
-                    _HeightScale,
-                    _HeightBias,
+                    _HeightMinKm,
+                    _HeightMaxKm,
+                    _HeightExaggeration,
+                    _KmPerUnit,
                     posOS,
                     normalOS
                 );
 
                 float3 posWS = TransformObjectToWorld(posOS);
                 output.positionCS = TransformWorldToHClip(posWS);
+                output.normalWS = TransformObjectToWorldNormal(normalOS);
                 output.uv = input.uv;
                 return output;
             }
@@ -262,7 +335,13 @@ Shader "Map/MapShader"
             {
                 UNITY_SETUP_INSTANCE_ID(input);
 
-                float2 uv = input.uv + _UVOffset;
+                float sphereLerp = saturate(_Sphere);
+                float2 planarUV = input.uv + _UVOffset;
+                float2 sphereUV = float2(
+                    input.uv.x,
+                    saturate(input.uv.y)
+                );
+                float2 uv = lerp(planarUV, sphereUV, sphereLerp);
                 float4 baseSample = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv);
                 float4 idSample = SAMPLE_TEXTURE2D(_ProvinceIDTex, sampler_ProvinceIDTex, uv);
 
@@ -277,7 +356,12 @@ Shader "Map/MapShader"
                     outColor
                 );
 
-                return float4(outColor, 1.0);
+                float3 normalWS = normalize(input.normalWS);
+                Light mainLight = GetMainLight();
+                float NdotL = saturate(dot(normalWS, mainLight.direction));
+                float3 lighting = 0.25.xxx + (NdotL * mainLight.color);
+
+                return float4(outColor * lighting, 1.0);
             }
             ENDHLSL
         }

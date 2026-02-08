@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Camera))]
-[ExecuteAlways]
 public class MapControllerEqr : MonoBehaviour
 {
     [Header("Scene References")]
@@ -10,11 +9,26 @@ public class MapControllerEqr : MonoBehaviour
     [SerializeField] Renderer mapRenderer; // mesh renderer for bounds calculation
 
     [Header("World Geometry")]
-    [SerializeField] float radius = 100f; // must match shader
+    float radius = 6371.0088f; // derived from earthRadiusKm / kmPerUnit
+    [SerializeField] float earthRadiusKm = 6371.0088f;
+    [SerializeField] float kmPerUnit = 1f;
+
+    [Header("Real-World Height")]
+    [SerializeField] float heightMinKm = -10.994f;
+    [SerializeField] float heightMaxKm = 8.849f;
+    [SerializeField] float heightExaggeration = 1f;
 
     [Header("Zoom")]
     [SerializeField] float zoomSpeed = 15f;
-    [SerializeField] float zoomInBuffer = 0.01f;
+    [SerializeField] float zoomInBuffer = 0.001f;
+
+    [Header("Camera Clipping")]
+    [SerializeField] bool autoFarClip = true;
+    [SerializeField] float farClipPaddingRadius = 3.5f;
+    [SerializeField] float minFarClip = 20000f;
+
+    [Header("Renderer Bounds")]
+    [SerializeField] bool autoExpandRendererBounds = true;
 
     [Header("Panning")]
     [SerializeField] float panKeySpeed = 60f;
@@ -71,16 +85,20 @@ public class MapControllerEqr : MonoBehaviour
             input = new InputSystem_Actions();
         }
 
+        UpdateDerivedRadius();
         UpdateMapDimensions();
+        SyncRendererBounds();
 
         CalculateZoomLimits();
 
         currentZoom = baseDistance;
         cameraLat = 0f;
+        SyncCameraFarClip();
 
         transform.localRotation = Quaternion.identity;
 
         PositionCamera();
+        SyncMaterialConstants();
         SetupFlatMap();
     }
 
@@ -140,6 +158,56 @@ public class MapControllerEqr : MonoBehaviour
     {
         mapWidth = 4f * radius;
         mapHeight = 2f * radius;
+    }
+
+    void UpdateDerivedRadius()
+    {
+        radius = earthRadiusKm / Mathf.Max(1e-6f, kmPerUnit);
+    }
+
+    void SyncMaterialConstants()
+    {
+        if (mapMat == null) return;
+        mapMat.SetFloat("_Radius", radius);
+        mapMat.SetFloat("_KmPerUnit", kmPerUnit);
+        mapMat.SetFloat("_HeightMinKm", heightMinKm);
+        mapMat.SetFloat("_HeightMaxKm", heightMaxKm);
+        mapMat.SetFloat("_HeightExaggeration", heightExaggeration);
+    }
+
+    void SyncRendererBounds()
+    {
+        if (!autoExpandRendererBounds || mapRenderer == null) return;
+
+        MeshFilter meshFilter = mapRenderer.GetComponent<MeshFilter>();
+        if (meshFilter == null || meshFilter.sharedMesh == null) return;
+
+        Mesh mesh = meshFilter.sharedMesh;
+        if (mesh == null) return;
+
+        float maxAbsElevationKm = Mathf.Max(Mathf.Abs(heightMinKm), Mathf.Abs(heightMaxKm));
+        float elevationExtentUnits = (maxAbsElevationKm * Mathf.Max(0f, heightExaggeration)) / Mathf.Max(1e-6f, kmPerUnit);
+
+        // Cover both Aitoff-planar extents and sphere extents used by the vertex shader.
+        float halfX = Mathf.Max(Mathf.PI * radius, radius + elevationExtentUnits);
+        float halfY = Mathf.Max(0.5f * Mathf.PI * radius, radius + elevationExtentUnits);
+        float halfZ = radius + elevationExtentUnits;
+
+        mesh.bounds = new Bounds(
+            Vector3.zero,
+            new Vector3(halfX * 2f, halfY * 2f, halfZ * 2f)
+        );
+    }
+
+    void SyncCameraFarClip()
+    {
+        if (cam == null || !autoFarClip) return;
+
+        float safeZoom = currentZoom > 0f ? currentZoom : Mathf.Max(baseDistance, maxZoom);
+        float maxAbsElevationKm = Mathf.Max(Mathf.Abs(heightMinKm), Mathf.Abs(heightMaxKm));
+        float elevationExtentUnits = (maxAbsElevationKm * Mathf.Max(0f, heightExaggeration)) / Mathf.Max(1e-6f, kmPerUnit);
+        float requiredFar = safeZoom + (radius * Mathf.Max(0f, farClipPaddingRadius)) + elevationExtentUnits;
+        cam.farClipPlane = Mathf.Max(minFarClip, requiredFar);
     }
 
     void PositionCamera()
@@ -266,9 +334,12 @@ public class MapControllerEqr : MonoBehaviour
         float zoomT = Mathf.InverseLerp(minZoom, maxZoom, currentZoom);
         float speedScale = Mathf.Lerp(0.2f, 1f, Mathf.Pow(Mathf.Clamp01(zoomT), 1f / 3f));
         currentZoom = Mathf.Clamp(currentZoom - scroll * zoomSpeed * speedScale, minZoom, maxZoom);
+        SyncCameraFarClip();
 
         if (mapMat != null)
         {
+            SyncMaterialConstants();
+
             if (autoSphereFromZoom)
             {
                 float switchZoom = GetSphereSwitchZoom();
@@ -382,8 +453,6 @@ public class MapControllerEqr : MonoBehaviour
 
         mapMat.SetVector("_UVOffset", new Vector2(uvOffsetX, uvOffsetY));
 
-        float heightLod = 0.0f;
-        mapMat.SetFloat("_HeightLod", heightLod);
     }
 
     void OnValidate()
@@ -393,7 +462,9 @@ public class MapControllerEqr : MonoBehaviour
             cam = GetComponent<Camera>();
         }
 
+        UpdateDerivedRadius();
         UpdateMapDimensions();
+        SyncRendererBounds();
         if (cam != null)
         {
             CalculateZoomLimits();
@@ -408,6 +479,7 @@ public class MapControllerEqr : MonoBehaviour
         {
             currentZoom = Mathf.Clamp(currentZoom, minZoom, maxZoom);
         }
+        SyncCameraFarClip();
 
         if (enableZoomMorph && maxZoom > minZoom)
         {
@@ -425,6 +497,8 @@ public class MapControllerEqr : MonoBehaviour
 
         if (mapMat != null)
         {
+            SyncMaterialConstants();
+
             if (autoSphereFromZoom)
             {
                 float switchZoom = GetSphereSwitchZoom();

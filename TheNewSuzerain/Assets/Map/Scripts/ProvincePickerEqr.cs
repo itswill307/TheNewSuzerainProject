@@ -9,9 +9,6 @@ public class ProvincePickerEqr : MonoBehaviour
     public Material mapMaterial;       // same material you set _Morph/_UVOffset on
     public Texture2D provinceIdTex;    // readable, point, no mips
 
-    [Header("Geometry")]
-    public float radius = 100f;        // must match your controller/shader R
-
     [Header("Highlight (optional)")]
     public bool highlightHovered = true;
     public string selectedIdProp   = "_SelectedID";
@@ -110,6 +107,7 @@ public class ProvincePickerEqr : MonoBehaviour
     bool TryGetUVUnderCursor(out Vector2 uv)
     {
         uv = default;
+        float radius = GetMapRadius();
 
         // Ray in MAP LOCAL space (so math matches your object-space projection)
         Vector2 screenPos = input.Map.Point.ReadValue<Vector2>();
@@ -148,14 +146,23 @@ public class ProvincePickerEqr : MonoBehaviour
 
         Vector3 p = ro + rd * t;
 
-        return TryProjectUVFromAitoff(p, out uv);
+        return TryProjectUVFromAitoff(p, radius, out uv);
     }
 
-    bool TryProjectUVFromAitoff(Vector3 p, out Vector2 uv)
+    float GetMapRadius()
+    {
+        if (mapMaterial != null && mapMaterial.HasProperty("_Radius"))
+        {
+            return Mathf.Max(1e-6f, mapMaterial.GetFloat("_Radius"));
+        }
+        return 100f;
+    }
+
+    bool TryProjectUVFromAitoff(Vector3 p, float radius, out Vector2 uv)
     {
         uv = default;
         float morph = mapMaterial.GetFloat("_Morph"); // 0=equirectangular, 1=aitoff
-        if (!TryInverseAitoffBlended(new Vector2(p.x, p.y), morph, out float lat, out float lon))
+        if (!TryInverseAitoffBlended(new Vector2(p.x, p.y), morph, radius, out float lat, out float lon))
         {
             return false;
         }
@@ -168,7 +175,7 @@ public class ProvincePickerEqr : MonoBehaviour
         return true;
     }
 
-    bool TryInverseAitoffBlended(Vector2 targetXY, float morph, out float latitude, out float longitude)
+    bool TryInverseAitoffBlended(Vector2 targetXY, float morph, float radius, out float latitude, out float longitude)
     {
         latitude = Mathf.Clamp(targetXY.y / radius, -Mathf.PI * 0.5f, Mathf.PI * 0.5f);
         longitude = Mathf.Clamp(targetXY.x / radius, -Mathf.PI, Mathf.PI);
@@ -177,16 +184,16 @@ public class ProvincePickerEqr : MonoBehaviour
         const float tolerance = 1e-4f;
         for (int i = 0; i < 8; i++)
         {
-            Vector2 f = ProjectAitoffBlended(latitude, longitude, morph) - targetXY;
+            Vector2 f = ProjectAitoffBlended(latitude, longitude, morph, radius) - targetXY;
             if (f.sqrMagnitude < tolerance * tolerance)
             {
                 return true;
             }
 
-            Vector2 fLatPlus = ProjectAitoffBlended(latitude + eps, longitude, morph);
-            Vector2 fLatMinus = ProjectAitoffBlended(latitude - eps, longitude, morph);
-            Vector2 fLonPlus = ProjectAitoffBlended(latitude, longitude + eps, morph);
-            Vector2 fLonMinus = ProjectAitoffBlended(latitude, longitude - eps, morph);
+            Vector2 fLatPlus = ProjectAitoffBlended(latitude + eps, longitude, morph, radius);
+            Vector2 fLatMinus = ProjectAitoffBlended(latitude - eps, longitude, morph, radius);
+            Vector2 fLonPlus = ProjectAitoffBlended(latitude, longitude + eps, morph, radius);
+            Vector2 fLonMinus = ProjectAitoffBlended(latitude, longitude - eps, morph, radius);
 
             Vector2 dF_dLat = (fLatPlus - fLatMinus) * (0.5f / eps);
             Vector2 dF_dLon = (fLonPlus - fLonMinus) * (0.5f / eps);
@@ -205,19 +212,19 @@ public class ProvincePickerEqr : MonoBehaviour
             longitude = Mathf.Repeat(longitude + deltaLon + Mathf.PI, 2f * Mathf.PI) - Mathf.PI;
         }
 
-        Vector2 finalError = ProjectAitoffBlended(latitude, longitude, morph) - targetXY;
+        Vector2 finalError = ProjectAitoffBlended(latitude, longitude, morph, radius) - targetXY;
         return finalError.sqrMagnitude < tolerance * tolerance;
     }
 
-    Vector2 ProjectAitoffBlended(float latitude, float longitude, float morph)
+    Vector2 ProjectAitoffBlended(float latitude, float longitude, float morph, float radius)
     {
         float cosPhi1 = 2f / Mathf.PI; // Winkel Tripel standard parallel
         Vector2 equirect = new Vector2(longitude * radius * cosPhi1, latitude * radius);
-        Vector2 aitoff = ProjectAitoff(latitude, longitude);
+        Vector2 aitoff = ProjectAitoff(latitude, longitude, radius);
         return Vector2.Lerp(equirect, aitoff, Mathf.Clamp01(morph));
     }
 
-    Vector2 ProjectAitoff(float latitude, float longitude)
+    Vector2 ProjectAitoff(float latitude, float longitude, float radius)
     {
         float halfLon = 0.5f * longitude;
         float cosLat = Mathf.Cos(latitude);
