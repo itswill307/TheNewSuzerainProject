@@ -10,7 +10,7 @@ Turkic republics, Islamic revival movements, and occupier counterinsurgency aris
 - restrict arms smuggling and other black market operations into western China
 - create a buffer against Germany
 - create a loyal state as a base to launch operations into the western German sphere
-##### [[USA]]/[[Italy]]
+##### [[United States of America]]/[[Italy]]
 - create chaos to prevent Germany or Japan from stabilizing the region and reaching their goals
 - create friendly states to base operations out of and destabilize the German and Japanese spheres
 	- much harder to support if Germany or Japan makes a concentrated effort to win

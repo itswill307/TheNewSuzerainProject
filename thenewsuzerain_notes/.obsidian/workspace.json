@@ -11,12 +11,30 @@
             "id": "0586d11b95445dc1",
             "type": "leaf",
             "state": {
-              "type": "excalidraw",
+              "type": "markdown",
               "state": {
-                "file": "Game/UI Mockup.md"
+                "file": "Countries/Americas/United States of America.md",
+                "mode": "source",
+                "source": false
               },
-              "icon": "excalidraw-icon",
-              "title": "UI Mockup"
+              "icon": "lucide-file",
+              "title": "United States of America"
+            }
+          }
+        ]
+      },
+      {
+        "id": "58d5986acbbfe75b",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "7b29f4ab74db85bf",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
             }
           }
         ]
@@ -92,7 +110,6 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Game/UI/UI Mockup.md",
                 "collapseAll": true,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -102,7 +119,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for UI Mockup"
+              "title": "Backlinks"
             }
           },
           {
@@ -180,8 +197,21 @@
       "obsidian-excalidraw-plugin:New drawing": false
     }
   },
-  "active": "81db627318107ff0",
+  "active": "7b29f4ab74db85bf",
   "lastOpenFiles": [
+    "Countries/Americas/United States of America.md",
+    "Countries/Asia/Korea.md",
+    "Countries/Europe/Reichskommissariat Kaukasien.md",
+    "Countries/Europe/Russia.md",
+    "Countries/Europe/Germany.md",
+    "Game/Plan.md",
+    "Game/Story.md",
+    "Countries/Europe/Hungary.md",
+    "German Reich Planned Borders.png",
+    "Countries/Asia/Central Asia.md",
+    "Reichskommissariat Kaukasien.md",
+    "Nzgermanplans.png",
+    "Countries/Europe/Mediterranean.md",
     "Game/UI Mockup.md",
     "Game/UI_images/48US.svg",
     "Game/UI_images",
@@ -192,34 +222,23 @@
     "Pasted Image 20260123005756_227 1.png",
     "Pasted Image 20260123005404_847.png",
     "Pasted Image 20260123004132_083.png",
-    "Game/Story.md",
     "box.png",
     "Untitled.canvas",
-    "Game/Plan.md",
-    "Countries/Europe/Germany.md",
     "Countries/Asia/Japan.md",
     "Countries/Europe/Italy.md",
-    "Countries/Americas/USA.md",
     "Game/Divergences.md",
     "Game/Conflict Starters.md",
-    "Countries/Asia/Central Asia.md",
     "Countries/Europe/Balkans.md",
     "Game/Timeline.md",
     "Untitled.base",
     "Countries/Asia/India.md",
     "Countries/Africa/Middle East.md",
     "Countries/Asia/Southeast Asia.md",
-    "Countries/Asia/Korea.md",
     "Countries/Asia/China.md",
-    "Countries/Europe/Caucasus.md",
-    "Countries/Europe/Hungary.md",
     "Countries/Europe/Axis.md",
     "Game/Gameplay.md",
     "Game/Choices.md",
-    "Countries/Europe/Mediterranean.md",
     "Countries/Americas",
-    "Countries/Europe/Russia.md",
-    "Reichskommissariat.md",
     "Countries/Asia",
     "Countries/Africa",
     "Countries/Europe",
