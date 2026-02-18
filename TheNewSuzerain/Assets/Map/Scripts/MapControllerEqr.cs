@@ -550,6 +550,18 @@ public class MapControllerEqr : MonoBehaviour
     public float FocusLongitudeDeg => GetFocusLongitudeDeg();
     public float CameraLatitudeDeg => cameraLat;
     public Vector2 CurrentUvOffset => new Vector2(focusLon / 360f, 0f);
+    public Quaternion GetBaseCameraLookRotation()
+    {
+        float lonDeg = GetFocusLongitudeDeg();
+        Vector3 surfaceNormal = CalculateSurfaceNormalAtLatLon(cameraLat, lonDeg);
+        Vector3 forward = -surfaceNormal;
+        if (forward.sqrMagnitude < 1e-6f)
+        {
+            forward = transform.forward;
+        }
+
+        return Quaternion.LookRotation(forward.normalized, Vector3.up);
+    }
 
     public bool TryGetLatLonAtScreen(Vector2 screenPos, out float latitudeDeg, out float longitudeDeg)
     {

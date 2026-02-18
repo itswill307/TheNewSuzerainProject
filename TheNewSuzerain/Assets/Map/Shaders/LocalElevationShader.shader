@@ -4,8 +4,11 @@ Shader "LocalElevationShader"
     {
         [Header(Textures)]
         _MainTex ("Base Color", 2D) = "white" {}
+        _LandcoverLUT ("Landcover LUT (256x1)", 2D) = "white" {}
         _ProvinceIDTex ("Province ID Map", 2D) = "white" {}
         _HeightTex ("Local Patch Height Map", 2D) = "black" {}
+        [Toggle] _UseLandcoverLUT ("Use Landcover LUT", Float) = 0
+        [Toggle] _MainTexIndexedSRGB ("Indexed MainTex Is sRGB", Float) = 1
 
         [Header(Geometry)]
         _UVOffset ("UV Offset (X,Y)", Vector) = (0, 0, 0, 0)
@@ -62,6 +65,9 @@ Shader "LocalElevationShader"
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
 
+            TEXTURE2D(_LandcoverLUT);
+            SAMPLER(sampler_LandcoverLUT);
+
             TEXTURE2D(_ProvinceIDTex);
             SAMPLER(sampler_ProvinceIDTex);
 
@@ -82,6 +88,8 @@ Shader "LocalElevationShader"
                 float _KmPerUnit;
                 float _SelectedID;
                 float _HoverID;
+                float _UseLandcoverLUT;
+                float _MainTexIndexedSRGB;
                 float _Sphere;
                 float _PatchCenterLonDeg;
                 float _PatchCenterLatDeg;
@@ -158,6 +166,25 @@ Shader "LocalElevationShader"
                 float edgeDist = min(min(uvLocal.x, 1.0 - uvLocal.x), min(uvLocal.y, 1.0 - uvLocal.y));
                 float fadeWidth = max(1e-5, _PatchEdgeFade);
                 return saturate(edgeDist / fadeWidth);
+            }
+
+            float3 SampleBaseColor(float2 uv)
+            {
+                float3 sampled = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv).rgb;
+                if (_UseLandcoverLUT <= 0.5)
+                {
+                    return sampled;
+                }
+
+                float idx01 = saturate(sampled.r);
+                if (_MainTexIndexedSRGB > 0.5)
+                {
+                    idx01 = LinearToSRGB(float3(idx01, idx01, idx01)).r;
+                }
+
+                float idx = round(saturate(idx01) * 255.0);
+                float lutU = (idx + 0.5) / 256.0;
+                return SAMPLE_TEXTURE2D(_LandcoverLUT, sampler_LandcoverLUT, float2(lutU, 0.5)).rgb;
             }
 
             float3 EvaluateDisplacedPosition(
@@ -277,7 +304,7 @@ Shader "LocalElevationShader"
                 float2 sphereUV = input.uvGlobal;
                 float2 sampleUV = lerp(planarUV, sphereUV, sphereLerp);
 
-                float4 baseSample = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, sampleUV);
+                float3 baseColor = SampleBaseColor(sampleUV);
                 float4 idSample = SAMPLE_TEXTURE2D(_ProvinceIDTex, sampler_ProvinceIDTex, sampleUV);
 
                 float3 outColor;
@@ -287,7 +314,7 @@ Shader "LocalElevationShader"
                     _HighlightColor,
                     _HoverID,
                     _HoverColor,
-                    baseSample.rgb,
+                    baseColor,
                     outColor
                 );
 

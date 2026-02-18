@@ -7,7 +7,7 @@ public class ProvincePickerEqr : MonoBehaviour
     [Header("Refs")]
     public Camera cam;                 // your WorldMapController camera
     public Material mapMaterial;       // same material you set _Morph/_UVOffset on
-    public Texture2D provinceIdTex;    // readable, point, no mips
+    public Texture2D provinceIdTex;    // point, no mips, Read/Write not required
     [SerializeField] Renderer[] additionalMapRenderers; // e.g., local detail patch renderer(s)
     [SerializeField] Material[] additionalMapMaterials;
 
@@ -27,8 +27,8 @@ public class ProvincePickerEqr : MonoBehaviour
     Renderer rend;
     readonly System.Collections.Generic.List<Renderer> targetRenderers = new System.Collections.Generic.List<Renderer>(8);
     readonly System.Collections.Generic.List<Material> targetMaterials = new System.Collections.Generic.List<Material>(8);
-    Color32[] idPixels;
-    int texW, texH;
+    RenderTexture provinceSampleRt;
+    Texture2D provinceSampleCpuTex;
     InputSystem_Actions input;
 
     void Awake()
@@ -37,14 +37,12 @@ public class ProvincePickerEqr : MonoBehaviour
         rend = GetComponent<Renderer>();
         input = new InputSystem_Actions();
 
-        if (!provinceIdTex || !provinceIdTex.isReadable)
+        if (!provinceIdTex)
         {
-            Debug.LogError("Province ID texture must be assigned and Read/Write enabled.");
+            Debug.LogError("Province ID texture must be assigned.");
             enabled = false; return;
         }
-        texW = provinceIdTex.width;
-        texH = provinceIdTex.height;
-        idPixels = provinceIdTex.GetPixels32(); // cache for speed
+        EnsureGpuSamplingResources();
 
         // Ensure material has the Province ID texture bound
         CollectTargetMaterials();
@@ -53,8 +51,24 @@ public class ProvincePickerEqr : MonoBehaviour
         SetIntOnAll(hoverIdProp, -1);
     }
 
-    void OnEnable() => input.Enable();
-    void OnDisable() => input.Disable();
+    void OnEnable()
+    {
+        input.Enable();
+        EnsureGpuSamplingResources();
+    }
+
+    void OnDisable()
+    {
+        input.Disable();
+        ClearSelectionState();
+        ReleaseGpuSamplingResources();
+    }
+
+    void OnDestroy()
+    {
+        ClearSelectionState();
+        ReleaseGpuSamplingResources();
+    }
 
     void Update()
     {
@@ -79,6 +93,11 @@ public class ProvincePickerEqr : MonoBehaviour
             v = Mathf.Clamp01(v);        // clamp Y
 
             int pid = SampleProvinceId(u, v);
+            if (pid < 0)
+            {
+                SetIntOnAll(hoverIdProp, -1);
+                return;
+            }
 
             // Block ocean/background selection/hover
             if (blockOcean && pid == oceanId)
@@ -171,6 +190,13 @@ public class ProvincePickerEqr : MonoBehaviour
             if (!mat || !mat.HasProperty(prop)) continue;
             mat.SetColor(prop, value);
         }
+    }
+
+    void ClearSelectionState()
+    {
+        CollectTargetMaterials();
+        SetIntOnAll(selectedIdProp, -1);
+        SetIntOnAll(hoverIdProp, -1);
     }
 
     bool TryGetUVUnderCursor(out Vector2 uv)
@@ -439,9 +465,65 @@ public class ProvincePickerEqr : MonoBehaviour
 
     int SampleProvinceId(float u, float v)
     {
-        int x = Mathf.Clamp(Mathf.FloorToInt(u * texW), 0, texW - 1);
-        int y = Mathf.Clamp(Mathf.FloorToInt(v * texH), 0, texH - 1);
-        Color32 c = idPixels[y * texW + x];
+        if (!EnsureGpuSamplingResources())
+        {
+            return -1;
+        }
+
+        // Blit a constant UV sample into a 1x1 target, then read back that pixel.
+        Graphics.Blit(provinceIdTex, provinceSampleRt, Vector2.zero, new Vector2(u, v));
+
+        RenderTexture previous = RenderTexture.active;
+        try
+        {
+            RenderTexture.active = provinceSampleRt;
+            provinceSampleCpuTex.ReadPixels(new Rect(0f, 0f, 1f, 1f), 0, 0, false);
+            provinceSampleCpuTex.Apply(false, false);
+        }
+        finally
+        {
+            RenderTexture.active = previous;
+        }
+
+        Color32 c = provinceSampleCpuTex.GetPixel(0, 0);
         return c.r | (c.g << 8) | (c.b << 16);
+    }
+
+    bool EnsureGpuSamplingResources()
+    {
+        if (provinceSampleRt == null)
+        {
+            provinceSampleRt = new RenderTexture(1, 1, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+            provinceSampleRt.filterMode = FilterMode.Point;
+            provinceSampleRt.wrapMode = TextureWrapMode.Clamp;
+            provinceSampleRt.useMipMap = false;
+            provinceSampleRt.autoGenerateMips = false;
+            provinceSampleRt.Create();
+        }
+
+        if (provinceSampleCpuTex == null)
+        {
+            provinceSampleCpuTex = new Texture2D(1, 1, TextureFormat.RGBA32, false, true);
+            provinceSampleCpuTex.wrapMode = TextureWrapMode.Clamp;
+            provinceSampleCpuTex.filterMode = FilterMode.Point;
+        }
+
+        return provinceSampleRt != null && provinceSampleCpuTex != null;
+    }
+
+    void ReleaseGpuSamplingResources()
+    {
+        if (provinceSampleRt != null)
+        {
+            provinceSampleRt.Release();
+            Destroy(provinceSampleRt);
+            provinceSampleRt = null;
+        }
+
+        if (provinceSampleCpuTex != null)
+        {
+            Destroy(provinceSampleCpuTex);
+            provinceSampleCpuTex = null;
+        }
     }
 }

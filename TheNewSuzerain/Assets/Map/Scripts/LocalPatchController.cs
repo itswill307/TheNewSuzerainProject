@@ -47,6 +47,7 @@ public class LocalPatchController : MonoBehaviour
     [SerializeField] bool releaseTileCacheWhenInactive = false;
 
     [Header("Debug")]
+    [SerializeField] bool disableLocalHeightMeshForTesting = false;
     [SerializeField] bool verboseLogs = false;
 
     const float TileStepDeg = 15f;
@@ -159,6 +160,17 @@ public class LocalPatchController : MonoBehaviour
         RefreshNow(force: true);
     }
 
+    public void SetDisableLocalHeightMeshForTesting(bool disabled)
+    {
+        if (disableLocalHeightMeshForTesting == disabled)
+        {
+            return;
+        }
+
+        disableLocalHeightMeshForTesting = disabled;
+        RefreshNow(force: true);
+    }
+
     void RefreshNow(bool force)
     {
         if (!ResolveReferences())
@@ -166,7 +178,7 @@ public class LocalPatchController : MonoBehaviour
             return;
         }
 
-        bool patchActive = !sphereModeOnly || mapController.SphereMode;
+        bool patchActive = (!sphereModeOnly || mapController.SphereMode) && !disableLocalHeightMeshForTesting;
         SetPatchActive(patchActive);
         if (!patchActive)
         {
@@ -263,6 +275,7 @@ public class LocalPatchController : MonoBehaviour
         if (source != null)
         {
             CopyTextureIfExists(source, localPatchMaterial, "_MainTex");
+            CopyTextureIfExists(source, localPatchMaterial, "_LandcoverLUT");
             CopyTextureIfExists(source, localPatchMaterial, "_ProvinceIDTex");
             CopyFloatIfExists(source, localPatchMaterial, "_Radius");
             CopyFloatIfExists(source, localPatchMaterial, "_Morph");
@@ -270,6 +283,8 @@ public class LocalPatchController : MonoBehaviour
             CopyFloatIfExists(source, localPatchMaterial, "_KmPerUnit");
             CopyFloatIfExists(source, localPatchMaterial, "_HeightMinKm");
             CopyFloatIfExists(source, localPatchMaterial, "_HeightMaxKm");
+            CopyFloatIfExists(source, localPatchMaterial, "_UseLandcoverLUT");
+            CopyFloatIfExists(source, localPatchMaterial, "_MainTexIndexedSRGB");
             if (localPatchMaterial.HasProperty("_HeightExaggeration")) localPatchMaterial.SetFloat("_HeightExaggeration", mapController.HeightExaggeration);
         }
         else

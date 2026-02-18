@@ -12,7 +12,8 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
-  m_InvalidKeywords: []
+  m_InvalidKeywords:
+  - _USELANDCOVERLUT_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -52,12 +53,16 @@ Material:
         m_Texture: {fileID: 2800000, guid: 24f39361c1eed4ef9b4e32a95ad3b444, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _LandcoverLUT:
+        m_Texture: {fileID: 2800000, guid: 234b5f7b02468fe44aa9e9ff2666742d, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _LeftTex:
         m_Texture: {fileID: 2800000, guid: 922b3546a8bf84754ab5e10637f310bb, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: e319e8b1af8617e47a82a34256192a9d, type: 3}
+        m_Texture: {fileID: 2800000, guid: 09aea03227bac7c4fa4f30e3fffb12ce, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
@@ -126,11 +131,12 @@ Material:
     - _HeightScale: 0
     - _HoverID: -1
     - _KmPerUnit: 1
-    - _LocalPatchCenterLatDeg: 46.48284
-    - _LocalPatchCenterLonDeg: 11.841003
+    - _LocalPatchCenterLatDeg: 41.960423
+    - _LocalPatchCenterLonDeg: 3.2218475
     - _LocalPatchMaskEnable: 0
     - _LocalPatchSpanLatDeg: 1.7986407
-    - _LocalPatchSpanLonDeg: 5.224265
+    - _LocalPatchSpanLonDeg: 4.837612
+    - _MainTexIndexedSRGB: 0
     - _Metallic: 0
     - _MinBrightness: 0.25
     - _Mode: 0
@@ -153,6 +159,7 @@ Material:
     - _SrcBlendAlpha: 1
     - _Surface: 0
     - _UVSec: 0
+    - _UseLandcoverLUT: 1
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1

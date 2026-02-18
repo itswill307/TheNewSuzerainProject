@@ -4,8 +4,11 @@ Shader "GlobalMapShader"
     {
         [Header(Textures)]
         _MainTex ("Base Color", 2D) = "white" {}
+        _LandcoverLUT ("Landcover LUT (256x1)", 2D) = "white" {}
         _ProvinceIDTex ("Province ID Map", 2D) = "white" {}
         _HeightTex ("Height Map", 2D) = "black" {}
+        [Toggle] _UseLandcoverLUT ("Use Landcover LUT", Float) = 0
+        [Toggle] _MainTexIndexedSRGB ("Indexed MainTex Is sRGB", Float) = 1
 
         [Header(Geometry)]
         _UVOffset ("UV Offset (X,Y)", Vector) = (0, 0, 0, 0)
@@ -62,6 +65,9 @@ Shader "GlobalMapShader"
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
 
+            TEXTURE2D(_LandcoverLUT);
+            SAMPLER(sampler_LandcoverLUT);
+
             TEXTURE2D(_ProvinceIDTex);
             SAMPLER(sampler_ProvinceIDTex);
 
@@ -83,6 +89,8 @@ Shader "GlobalMapShader"
                 float _KmPerUnit;
                 float _SelectedID;
                 float _HoverID;
+                float _UseLandcoverLUT;
+                float _MainTexIndexedSRGB;
                 float _Sphere;
                 float _LocalPatchMaskEnable;
                 float _LocalPatchCenterLonDeg;
@@ -136,6 +144,25 @@ Shader "GlobalMapShader"
             {
                 float d = abs(frac((lonA - lonB) / TWO_PI_ + 0.5) - 0.5) * TWO_PI_;
                 return d;
+            }
+
+            float3 SampleBaseColor(float2 uv)
+            {
+                float3 sampled = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv).rgb;
+                if (_UseLandcoverLUT <= 0.5)
+                {
+                    return sampled;
+                }
+
+                float idx01 = saturate(sampled.r);
+                if (_MainTexIndexedSRGB > 0.5)
+                {
+                    idx01 = LinearToSRGB(float3(idx01, idx01, idx01)).r;
+                }
+
+                float idx = round(saturate(idx01) * 255.0);
+                float lutU = (idx + 0.5) / 256.0;
+                return SAMPLE_TEXTURE2D(_LandcoverLUT, sampler_LandcoverLUT, float2(lutU, 0.5)).rgb;
             }
 
             float3 EvaluateDisplacedPosition(
@@ -378,7 +405,7 @@ Shader "GlobalMapShader"
                     saturate(input.uv.y)
                 );
                 float2 uv = lerp(planarUV, sphereUV, sphereLerp);
-                float4 baseSample = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv);
+                float3 baseColor = SampleBaseColor(uv);
                 float4 idSample = SAMPLE_TEXTURE2D(_ProvinceIDTex, sampler_ProvinceIDTex, uv);
 
                 float3 outColor;
@@ -388,7 +415,7 @@ Shader "GlobalMapShader"
                     _HighlightColor,
                     _HoverID,
                     _HoverColor,
-                    baseSample.rgb,
+                    baseColor,
                     outColor
                 );
 

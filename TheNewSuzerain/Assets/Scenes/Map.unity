@@ -426,6 +426,7 @@ MonoBehaviour:
   maxCachedTiles: 24
   releaseUnusedTilesImmediately: 0
   releaseTileCacheWhenInactive: 0
+  disableLocalHeightMeshForTesting: 1
   verboseLogs: 0
 --- !u!1 &722242146
 GameObject:
@@ -567,8 +568,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1923a6cd6fb50764f9b31a2686ef3aec, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DirectionalLightFollowCamera
+  mapController: {fileID: 101723297}
   targetCamera: {fileID: 101723295}
   useMainCameraIfMissing: 1
+  useMapControllerBaseRotation: 1
   lookOppositeCameraForward: 0
   eulerOffset: {x: 0, y: 0, z: 0}
   updateInEditMode: 0

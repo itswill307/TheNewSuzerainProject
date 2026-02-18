@@ -5,10 +5,12 @@ using UnityEngine;
 public class DirectionalLightFollowCamera : MonoBehaviour
 {
     [Header("References")]
+    [SerializeField] MapControllerEqr mapController;
     [SerializeField] Camera targetCamera;
     [SerializeField] bool useMainCameraIfMissing = true;
 
     [Header("Behavior")]
+    [SerializeField] bool useMapControllerBaseRotation = true;
     [SerializeField] bool lookOppositeCameraForward = false;
     [SerializeField] Vector3 eulerOffset = Vector3.zero;
     [SerializeField] bool updateInEditMode = false;
@@ -23,12 +25,17 @@ public class DirectionalLightFollowCamera : MonoBehaviour
         {
             targetCamera = Camera.main;
         }
+        if (mapController == null && targetCamera != null)
+        {
+            mapController = targetCamera.GetComponent<MapControllerEqr>();
+        }
     }
 
     void OnEnable()
     {
         attachedLight = GetComponent<Light>();
         TryAutoAssignCamera();
+        TryAutoAssignMapController();
         warnedNonDirectional = false;
     }
 
@@ -36,6 +43,7 @@ public class DirectionalLightFollowCamera : MonoBehaviour
     {
         attachedLight = GetComponent<Light>();
         TryAutoAssignCamera();
+        TryAutoAssignMapController();
     }
 
     void LateUpdate()
@@ -58,14 +66,27 @@ public class DirectionalLightFollowCamera : MonoBehaviour
         targetCamera = Camera.main;
     }
 
+    void TryAutoAssignMapController()
+    {
+        if (mapController != null)
+        {
+            return;
+        }
+
+        if (targetCamera != null)
+        {
+            mapController = targetCamera.GetComponent<MapControllerEqr>();
+        }
+        else if (useMainCameraIfMissing && Camera.main != null)
+        {
+            mapController = Camera.main.GetComponent<MapControllerEqr>();
+        }
+    }
+
     void ApplyRotation()
     {
-        Camera cam = targetCamera;
-        if (cam == null && useMainCameraIfMissing)
-        {
-            cam = Camera.main;
-        }
-        if (cam == null)
+        Quaternion sourceRotation;
+        if (!TryGetSourceRotation(out sourceRotation))
         {
             return;
         }
@@ -76,12 +97,40 @@ public class DirectionalLightFollowCamera : MonoBehaviour
             warnedNonDirectional = true;
         }
 
-        Quaternion rot = cam.transform.rotation;
+        Quaternion rot = sourceRotation;
         if (lookOppositeCameraForward)
         {
             rot = rot * Quaternion.Euler(0f, 180f, 0f);
         }
 
         transform.rotation = rot * Quaternion.Euler(eulerOffset);
+    }
+
+    bool TryGetSourceRotation(out Quaternion sourceRotation)
+    {
+        sourceRotation = Quaternion.identity;
+
+        if (useMapControllerBaseRotation)
+        {
+            TryAutoAssignMapController();
+            if (mapController != null)
+            {
+                sourceRotation = mapController.GetBaseCameraLookRotation();
+                return true;
+            }
+        }
+
+        Camera cam = targetCamera;
+        if (cam == null && useMainCameraIfMissing)
+        {
+            cam = Camera.main;
+        }
+        if (cam == null)
+        {
+            return false;
+        }
+
+        sourceRotation = cam.transform.rotation;
+        return true;
     }
 }
