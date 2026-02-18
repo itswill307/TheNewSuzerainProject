@@ -17,6 +17,12 @@ public class MapControllerEqr : MonoBehaviour
     [SerializeField] float heightMinKm = -10.994f;
     [SerializeField] float heightMaxKm = 8.849f;
     [SerializeField] float heightExaggeration = 1f;
+    [SerializeField, Tooltip("Enables elevation displacement on the global map mesh.")]
+    bool enableGlobalElevation = false;
+    [SerializeField, Tooltip("Multiplier applied to displaced elevation extent when calculating the minimum safe near-clip zoom distance.")]
+    float nearBufferElevationMultiplier = 1f;
+    [SerializeField, Tooltip("Additional fixed world-units added to the near-clip safety buffer.")]
+    float nearBufferExtraUnits = 0f;
 
     [Header("Zoom")]
     [SerializeField] float zoomSpeed = 15f;
@@ -136,7 +142,10 @@ public class MapControllerEqr : MonoBehaviour
         baseDistance = horizontalDistance;
         maxZoom = horizontalDistance;
         float minByBuffer = radius * zoomInBuffer;
-        float nearBuffer = cam.nearClipPlane + (radius * 0.01f);
+        float elevationExtentUnits = GetElevationExtentUnits();
+        float nearBuffer = cam.nearClipPlane
+            + (elevationExtentUnits * Mathf.Max(0f, nearBufferElevationMultiplier))
+            + Mathf.Max(0f, nearBufferExtraUnits);
         float maxPitchAbs = Mathf.Max(Mathf.Abs(minPitchDeg), Mathf.Abs(maxPitchDeg));
         float cosMaxPitch = Mathf.Cos(maxPitchAbs * Mathf.Deg2Rad);
         if (cosMaxPitch < 0.01f) cosMaxPitch = 0.01f;
@@ -172,7 +181,13 @@ public class MapControllerEqr : MonoBehaviour
         mapMat.SetFloat("_KmPerUnit", kmPerUnit);
         mapMat.SetFloat("_HeightMinKm", heightMinKm);
         mapMat.SetFloat("_HeightMaxKm", heightMaxKm);
-        mapMat.SetFloat("_HeightExaggeration", heightExaggeration);
+        mapMat.SetFloat("_HeightExaggeration", GetGlobalHeightExaggeration());
+    }
+
+    float GetGlobalHeightExaggeration()
+    {
+        if (!enableGlobalElevation) return 0f;
+        return Mathf.Max(0f, heightExaggeration);
     }
 
     void SyncRendererBounds()
@@ -185,8 +200,7 @@ public class MapControllerEqr : MonoBehaviour
         Mesh mesh = meshFilter.sharedMesh;
         if (mesh == null) return;
 
-        float maxAbsElevationKm = Mathf.Max(Mathf.Abs(heightMinKm), Mathf.Abs(heightMaxKm));
-        float elevationExtentUnits = (maxAbsElevationKm * Mathf.Max(0f, heightExaggeration)) / Mathf.Max(1e-6f, kmPerUnit);
+        float elevationExtentUnits = GetElevationExtentUnits();
 
         // Cover both Aitoff-planar extents and sphere extents used by the vertex shader.
         float halfX = Mathf.Max(Mathf.PI * radius, radius + elevationExtentUnits);
@@ -204,10 +218,15 @@ public class MapControllerEqr : MonoBehaviour
         if (cam == null || !autoFarClip) return;
 
         float safeZoom = currentZoom > 0f ? currentZoom : Mathf.Max(baseDistance, maxZoom);
-        float maxAbsElevationKm = Mathf.Max(Mathf.Abs(heightMinKm), Mathf.Abs(heightMaxKm));
-        float elevationExtentUnits = (maxAbsElevationKm * Mathf.Max(0f, heightExaggeration)) / Mathf.Max(1e-6f, kmPerUnit);
+        float elevationExtentUnits = GetElevationExtentUnits();
         float requiredFar = safeZoom + (radius * Mathf.Max(0f, farClipPaddingRadius)) + elevationExtentUnits;
         cam.farClipPlane = Mathf.Max(minFarClip, requiredFar);
+    }
+
+    float GetElevationExtentUnits()
+    {
+        float maxAbsElevationKm = Mathf.Max(Mathf.Abs(heightMinKm), Mathf.Abs(heightMaxKm));
+        return (maxAbsElevationKm * Mathf.Max(0f, heightExaggeration)) / Mathf.Max(1e-6f, kmPerUnit);
     }
 
     void PositionCamera()
@@ -462,6 +481,9 @@ public class MapControllerEqr : MonoBehaviour
             cam = GetComponent<Camera>();
         }
 
+        nearBufferElevationMultiplier = Mathf.Max(0f, nearBufferElevationMultiplier);
+        nearBufferExtraUnits = Mathf.Max(0f, nearBufferExtraUnits);
+
         UpdateDerivedRadius();
         UpdateMapDimensions();
         SyncRendererBounds();
@@ -514,6 +536,33 @@ public class MapControllerEqr : MonoBehaviour
             PositionCamera();
             UpdateUVOffset();
         }
+    }
+
+    // Public read-only state for systems that need to stay in sync with map projection/camera state.
+    public Material MapMaterial => mapMat;
+    public float RadiusUnits => radius;
+    public float KmPerUnit => kmPerUnit;
+    public float HeightMinKm => heightMinKm;
+    public float HeightMaxKm => heightMaxKm;
+    public float HeightExaggeration => heightExaggeration;
+    public float CurrentMorph => currentMorph;
+    public bool SphereMode => sphereMode;
+    public float FocusLongitudeDeg => GetFocusLongitudeDeg();
+    public float CameraLatitudeDeg => cameraLat;
+    public Vector2 CurrentUvOffset => new Vector2(focusLon / 360f, 0f);
+
+    public bool TryGetLatLonAtScreen(Vector2 screenPos, out float latitudeDeg, out float longitudeDeg)
+    {
+        latitudeDeg = 0f;
+        longitudeDeg = 0f;
+        if (!TryGetUVAtScreen(screenPos, out Vector2 uv))
+        {
+            return false;
+        }
+
+        longitudeDeg = (uv.x - 0.5f) * 360f;
+        latitudeDeg = (uv.y - 0.5f) * 180f;
+        return true;
     }
 
     bool TryGetUVAtScreen(Vector2 screenPos, out Vector2 uv)
@@ -579,8 +628,9 @@ public class MapControllerEqr : MonoBehaviour
         longitude = Mathf.Clamp(targetXY.x / radius, -Mathf.PI, Mathf.PI);
 
         const float stepEps = 1e-4f;
-        const float tolerance = 1e-4f;
-        for (int i = 0; i < 8; i++)
+        // Residual is in world units; scale tolerance with radius so convergence remains stable at large map scales.
+        float tolerance = Mathf.Max(1e-4f, radius * 1e-6f);
+        for (int i = 0; i < 12; i++)
         {
             Vector2 residual = ProjectAitoffBlended(latitude, longitude, morph) - targetXY;
             if (residual.sqrMagnitude < tolerance * tolerance)

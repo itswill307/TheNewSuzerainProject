@@ -120,12 +120,17 @@ Material:
     - _GlossinessSource: 0
     - _GlossyReflections: 0
     - _HeightBias: 0
-    - _HeightExaggeration: 1
+    - _HeightExaggeration: 0
     - _HeightMaxKm: 8.849
     - _HeightMinKm: -10.994
     - _HeightScale: 0
     - _HoverID: -1
     - _KmPerUnit: 1
+    - _LocalPatchCenterLatDeg: 46.48284
+    - _LocalPatchCenterLonDeg: 11.841003
+    - _LocalPatchMaskEnable: 0
+    - _LocalPatchSpanLatDeg: 1.7986407
+    - _LocalPatchSpanLonDeg: 5.224265
     - _Metallic: 0
     - _MinBrightness: 0.25
     - _Mode: 0
