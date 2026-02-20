@@ -37,7 +37,8 @@ public class MapControllerEqr : MonoBehaviour
     [SerializeField] bool autoExpandRendererBounds = true;
 
     [Header("Panning")]
-    [SerializeField] float panKeySpeed = 60f;
+    [SerializeField, Tooltip("Keyboard pan speed in screen pixels per second.")]
+    float panKeySpeed = 1000f;
     [SerializeField] float panDragSpeed = 1f;
 
     [Header("Rotation")]
@@ -396,9 +397,20 @@ public class MapControllerEqr : MonoBehaviour
         float worldUnitsPerPixelY = (2f * currentZoom * Mathf.Tan(verticalFovRad * 0.5f)) / Screen.height;
 
         float degreesPerPixelY = (worldUnitsPerPixelY / mapHeight) * 180f;
+        float cosLat = Mathf.Cos(cameraLat * Mathf.Deg2Rad);
+        float widthFactor = Mathf.Lerp(1f, cosLat, currentMorph * 0.5f);
+        widthFactor = Mathf.Max(0.01f, widthFactor);
+        float degreesPerPixelX = (worldUnitsPerPixelX / (mapWidth * widthFactor)) * 360f;
 
-        float panLon = moveKeys.x * panKeySpeed * Time.deltaTime;
-        float panLat = moveKeys.y * panKeySpeed * Time.deltaTime;
+        if (TryGetCenterPanDegreesPerPixel(out float sampledDegreesPerPixelX, out float sampledDegreesPerPixelY))
+        {
+            degreesPerPixelX = sampledDegreesPerPixelX;
+            degreesPerPixelY = sampledDegreesPerPixelY;
+        }
+
+        // panKeySpeed is interpreted as screen pixels per second.
+        float panLon = moveKeys.x * panKeySpeed * degreesPerPixelX * Time.deltaTime;
+        float panLat = moveKeys.y * panKeySpeed * degreesPerPixelY * Time.deltaTime;
 
         if (dragPan.sqrMagnitude > 0.0f && mapRenderer != null)
         {
@@ -421,11 +433,6 @@ public class MapControllerEqr : MonoBehaviour
             else
             {
                 // Fallback to center-lat scaling if UV lookup fails.
-                float cosLat = Mathf.Cos(cameraLat * Mathf.Deg2Rad);
-                float widthFactor = Mathf.Lerp(1f, cosLat, currentMorph * 0.5f);
-                widthFactor = Mathf.Max(0.01f, widthFactor);
-                float degreesPerPixelX = (worldUnitsPerPixelX / (mapWidth * widthFactor)) * 360f;
-
                 panLon += -dragPan.x * degreesPerPixelX * panDragSpeed;
                 panLat += -dragPan.y * degreesPerPixelY * panDragSpeed;
             }
@@ -616,6 +623,39 @@ public class MapControllerEqr : MonoBehaviour
         Vector3 planeHitPoint = rayOriginOS + rayDirOS * planeHitDistance;
 
         return TryProjectUVFromAitoff(planeHitPoint, out uv);
+    }
+
+    bool TryGetCenterPanDegreesPerPixel(out float degreesPerPixelX, out float degreesPerPixelY)
+    {
+        degreesPerPixelX = 0f;
+        degreesPerPixelY = 0f;
+        if (cam == null) return false;
+
+        const float sampleStepPixels = 12f;
+        Vector2 center = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+        Vector2 right = center + new Vector2(sampleStepPixels, 0f);
+        Vector2 up = center + new Vector2(0f, sampleStepPixels);
+
+        if (!TryGetUVAtScreen(center, out Vector2 uvCenter))
+        {
+            return false;
+        }
+
+        bool hasRight = TryGetUVAtScreen(right, out Vector2 uvRight);
+        bool hasUp = TryGetUVAtScreen(up, out Vector2 uvUp);
+        if (!hasRight || !hasUp)
+        {
+            return false;
+        }
+
+        float lonCenter = (uvCenter.x - 0.5f) * 360f;
+        float latCenter = (uvCenter.y - 0.5f) * 180f;
+        float lonRight = (uvRight.x - 0.5f) * 360f;
+        float latUp = (uvUp.y - 0.5f) * 180f;
+
+        degreesPerPixelX = Mathf.DeltaAngle(lonCenter, lonRight) / sampleStepPixels;
+        degreesPerPixelY = (latUp - latCenter) / sampleStepPixels;
+        return true;
     }
 
     bool TryProjectUVFromAitoff(Vector3 projectedPoint, out Vector2 uv)

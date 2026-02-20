@@ -285,7 +285,7 @@ MonoBehaviour:
   farClipPaddingRadius: 3.5
   minFarClip: 20000
   autoExpandRendererBounds: 1
-  panKeySpeed: 60
+  panKeySpeed: 1000
   panDragSpeed: 1
   rotateSensitivity: 0.2
   minPitchDeg: -80
