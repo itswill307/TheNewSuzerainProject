@@ -17,12 +17,20 @@ public class LocalTerrainServer : MonoBehaviour
 
     private sealed class ServerState
     {
+        public sealed class DataEntry
+        {
+            public ZipArchiveEntry ZipEntry;
+            public string FilePath;
+            public long Length;
+        }
+
         public string Name;
         public int Port;
-        public string ArchivePath;
+        public string SourcePath;
+        public bool SourceIsArchive;
         public FileStream ArchiveStream;
         public ZipArchive Archive;
-        public Dictionary<string, ZipArchiveEntry> EntryIndex;
+        public Dictionary<string, DataEntry> EntryIndex;
         public HttpListener Listener;
         public Thread Thread;
         public Dictionary<string, CacheItem> TileCache;
@@ -37,10 +45,13 @@ public class LocalTerrainServer : MonoBehaviour
     private volatile bool _running;
 
     public int port = 8080;
-    public string archiveName = "heightmap.zip"; // primary archive in StreamingAssets
+    public string archiveName = "heightmap"; // resolved from project root/MapData for relative paths: folder first, zip second
     [SerializeField] private bool loadSecondaryArchive = true;
     [SerializeField] private int secondaryPort = 8081;
-    [SerializeField] private string secondaryArchiveName = "terrain.zip";
+    [SerializeField] private string secondaryArchiveName = "terrain";
+    [SerializeField] private bool useDirectoryManifestIndex = true;
+    [SerializeField] private string directoryManifestFileName = "manifest.tsv";
+    [SerializeField] private bool writeDirectoryManifestWhenMissing = false;
     [SerializeField, Min(0)] private int maxCachedTilesPerServer = 512;
     [SerializeField] private int maxMissingRequestLogs = 20;
     [SerializeField] private bool logMissingRequests = false;
@@ -98,7 +109,7 @@ public class LocalTerrainServer : MonoBehaviour
 
                 Debug.Log(
                     $"LocalTerrainServer: {localServer.Name} running at http://localhost:{localServer.Port}/ " +
-                    $"using '{Path.GetFileName(localServer.ArchivePath)}'.");
+                    $"using '{Path.GetFileName(localServer.SourcePath)}'.");
             }
 
             Debug.Log($"LocalTerrainServer: started {startedCount} endpoint(s).");
@@ -153,32 +164,55 @@ public class LocalTerrainServer : MonoBehaviour
             }
         }
 
-        string archivePath = Path.Combine(Application.streamingAssetsPath, archiveFileName);
+        string sourcePath = ResolveSourcePath(archiveFileName);
+        if (string.IsNullOrEmpty(sourcePath))
+        {
+            if (required)
+            {
+                Debug.LogError(
+                    $"LocalTerrainServer: required source '{archiveFileName}' not found. " +
+                    "Looked in project root/MapData (for relative paths).");
+                return false;
+            }
+
+            Debug.LogWarning(
+                $"LocalTerrainServer: optional source '{archiveFileName}' not found. " +
+                "Looked in project root/MapData (for relative paths).");
+            return true;
+        }
+
         FileStream archiveStream;
         ZipArchive archive;
-        Dictionary<string, ZipArchiveEntry> entryIndex;
+        Dictionary<string, ServerState.DataEntry> entryIndex;
         long totalBytes;
         int fileCount;
         int maxTerrainZoom;
+        bool sourceIsArchive;
+        bool usedManifestIndex;
 
         try
         {
-            if (!TryOpenArchive(
-                archivePath,
+            if (!TryOpenSource(
+                sourcePath,
+                useDirectoryManifestIndex,
+                directoryManifestFileName,
+                writeDirectoryManifestWhenMissing,
                 out archiveStream,
                 out archive,
                 out entryIndex,
                 out fileCount,
                 out totalBytes,
-                out maxTerrainZoom))
+                out maxTerrainZoom,
+                out sourceIsArchive,
+                out usedManifestIndex))
             {
                 if (required)
                 {
-                    Debug.LogError($"LocalTerrainServer: required archive not found at '{archivePath}'.");
+                    Debug.LogError($"LocalTerrainServer: required source not found at '{sourcePath}'.");
                     return false;
                 }
 
-                Debug.LogWarning($"LocalTerrainServer: optional archive not found at '{archivePath}'.");
+                Debug.LogWarning($"LocalTerrainServer: optional source not found at '{sourcePath}'.");
                 return true;
             }
         }
@@ -186,11 +220,11 @@ public class LocalTerrainServer : MonoBehaviour
         {
             if (required)
             {
-                Debug.LogError($"LocalTerrainServer: failed loading required archive '{archivePath}': {e.Message}");
+                Debug.LogError($"LocalTerrainServer: failed loading required source '{sourcePath}': {e.Message}");
                 return false;
             }
 
-            Debug.LogWarning($"LocalTerrainServer: optional archive '{archivePath}' failed to load: {e.Message}");
+            Debug.LogWarning($"LocalTerrainServer: optional source '{sourcePath}' failed to load: {e.Message}");
             return true;
         }
 
@@ -236,7 +270,8 @@ public class LocalTerrainServer : MonoBehaviour
         {
             Name = name,
             Port = serverPort,
-            ArchivePath = archivePath,
+            SourcePath = sourcePath,
+            SourceIsArchive = sourceIsArchive,
             ArchiveStream = archiveStream,
             Archive = archive,
             EntryIndex = entryIndex,
@@ -250,7 +285,8 @@ public class LocalTerrainServer : MonoBehaviour
         };
 
         Debug.Log(
-            $"LocalTerrainServer: {name} indexed {fileCount} files ({totalBytes:N0} bytes uncompressed) from '{archivePath}'. " +
+            $"LocalTerrainServer: {name} indexed {fileCount} files ({totalBytes:N0} bytes uncompressed) from '{sourcePath}' " +
+            $"({GetSourceModeLabel(sourceIsArchive, usedManifestIndex, directoryManifestFileName)}). " +
             $"RAM tile cache limit: {server.TileCacheLimit}.");
         if (maxTerrainZoom >= 0)
         {
@@ -260,14 +296,19 @@ public class LocalTerrainServer : MonoBehaviour
         return true;
     }
 
-    private static bool TryOpenArchive(
-        string archivePath,
+    private static bool TryOpenSource(
+        string sourcePath,
+        bool useDirectoryManifestIndex,
+        string directoryManifestFileName,
+        bool writeDirectoryManifestWhenMissing,
         out FileStream archiveStream,
         out ZipArchive archive,
-        out Dictionary<string, ZipArchiveEntry> entryIndex,
+        out Dictionary<string, ServerState.DataEntry> entryIndex,
         out int fileCount,
         out long totalBytes,
-        out int maxTerrainZoom)
+        out int maxTerrainZoom,
+        out bool sourceIsArchive,
+        out bool usedManifestIndex)
     {
         archiveStream = null;
         archive = null;
@@ -275,13 +316,66 @@ public class LocalTerrainServer : MonoBehaviour
         fileCount = 0;
         totalBytes = 0;
         maxTerrainZoom = -1;
+        sourceIsArchive = false;
+        usedManifestIndex = false;
 
-        if (!File.Exists(archivePath))
+        if (Directory.Exists(sourcePath))
+        {
+            if (useDirectoryManifestIndex && TryLoadDirectoryManifest(
+                sourcePath,
+                directoryManifestFileName,
+                out entryIndex,
+                out fileCount,
+                out totalBytes,
+                out maxTerrainZoom))
+            {
+                usedManifestIndex = true;
+                return true;
+            }
+
+            entryIndex = new Dictionary<string, ServerState.DataEntry>(StringComparer.Ordinal);
+            foreach (string filePath in Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories))
+            {
+                string key = GetDirectoryEntryKey(sourcePath, filePath);
+                if (string.IsNullOrEmpty(key)) continue;
+
+                var fileInfo = new FileInfo(filePath);
+                entryIndex[key] = new ServerState.DataEntry
+                {
+                    FilePath = filePath,
+                    ZipEntry = null,
+                    Length = fileInfo.Exists ? fileInfo.Length : 0
+                };
+                fileCount++;
+
+                if (fileInfo.Exists && fileInfo.Length > 0)
+                {
+                    totalBytes += fileInfo.Length;
+                }
+
+                if (key.EndsWith(".terrain", StringComparison.OrdinalIgnoreCase) &&
+                    TryGetZoomFromKey(key, out int zoom) &&
+                    zoom > maxTerrainZoom)
+                {
+                    maxTerrainZoom = zoom;
+                }
+            }
+
+            if (useDirectoryManifestIndex && writeDirectoryManifestWhenMissing)
+            {
+                TryWriteDirectoryManifest(sourcePath, directoryManifestFileName, entryIndex, maxTerrainZoom);
+            }
+
+            return true;
+        }
+
+        if (!File.Exists(sourcePath))
         {
             return false;
         }
 
-        archiveStream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        sourceIsArchive = true;
+        archiveStream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         try
         {
             archive = new ZipArchive(archiveStream, ZipArchiveMode.Read, leaveOpen: false);
@@ -295,7 +389,7 @@ public class LocalTerrainServer : MonoBehaviour
 
         try
         {
-            entryIndex = new Dictionary<string, ZipArchiveEntry>(archive.Entries.Count);
+            entryIndex = new Dictionary<string, ServerState.DataEntry>(archive.Entries.Count, StringComparer.Ordinal);
             foreach (var entry in archive.Entries)
             {
                 if (string.IsNullOrEmpty(entry.Name)) continue; // skip directories
@@ -303,7 +397,12 @@ public class LocalTerrainServer : MonoBehaviour
                 string key = NormalizeKey(entry.FullName);
                 if (string.IsNullOrEmpty(key)) continue;
 
-                entryIndex[key] = entry;
+                entryIndex[key] = new ServerState.DataEntry
+                {
+                    ZipEntry = entry,
+                    FilePath = null,
+                    Length = entry.Length
+                };
                 fileCount++;
 
                 if (entry.Length > 0)
@@ -339,6 +438,322 @@ public class LocalTerrainServer : MonoBehaviour
             maxTerrainZoom = -1;
             throw;
         }
+    }
+
+    private static string GetSourceModeLabel(bool sourceIsArchive, bool usedManifestIndex, string directoryManifestFileName)
+    {
+        if (sourceIsArchive)
+        {
+            return "zip archive";
+        }
+
+        if (usedManifestIndex)
+        {
+            return $"directory source via manifest '{directoryManifestFileName}'";
+        }
+
+        return "directory source (full scan)";
+    }
+
+    private static bool TryLoadDirectoryManifest(
+        string sourcePath,
+        string manifestFileName,
+        out Dictionary<string, ServerState.DataEntry> entryIndex,
+        out int fileCount,
+        out long totalBytes,
+        out int maxTerrainZoom)
+    {
+        entryIndex = null;
+        fileCount = 0;
+        totalBytes = 0;
+        maxTerrainZoom = -1;
+
+        if (string.IsNullOrWhiteSpace(sourcePath))
+        {
+            return false;
+        }
+
+        string fileName = string.IsNullOrWhiteSpace(manifestFileName) ? "_tile_index.tsv" : manifestFileName.Trim();
+        string manifestPath = Path.Combine(sourcePath, fileName);
+        if (!File.Exists(manifestPath))
+        {
+            return false;
+        }
+
+        string rootPath = Path.GetFullPath(sourcePath);
+        string rootWithSeparator = rootPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var parsedIndex = new Dictionary<string, ServerState.DataEntry>(StringComparer.Ordinal);
+        bool hasMaxZoomHeader = false;
+
+        foreach (string rawLine in File.ReadLines(manifestPath))
+        {
+            if (string.IsNullOrWhiteSpace(rawLine))
+            {
+                continue;
+            }
+
+            string line = rawLine.Trim();
+            if (line.Length == 0)
+            {
+                continue;
+            }
+
+            if (line[0] == '#')
+            {
+                const string maxZoomPrefix = "#maxTerrainZoom=";
+                if (line.StartsWith(maxZoomPrefix, StringComparison.OrdinalIgnoreCase) &&
+                    int.TryParse(line.Substring(maxZoomPrefix.Length), out int parsedMaxZoom))
+                {
+                    maxTerrainZoom = parsedMaxZoom;
+                    hasMaxZoomHeader = true;
+                }
+                continue;
+            }
+
+            int separatorIndex = line.IndexOf('\t');
+            string rawKey = separatorIndex >= 0 ? line.Substring(0, separatorIndex) : line;
+            string rawLength = separatorIndex >= 0 ? line.Substring(separatorIndex + 1) : string.Empty;
+
+            string key = NormalizeKey(rawKey);
+            if (string.IsNullOrWhiteSpace(key) || key.Contains("..") || Path.IsPathRooted(key))
+            {
+                continue;
+            }
+
+            long length = 0;
+            if (!string.IsNullOrWhiteSpace(rawLength))
+            {
+                long.TryParse(rawLength, out length);
+                if (length < 0) length = 0;
+            }
+
+            string candidatePath = Path.Combine(rootPath, key.Replace('/', Path.DirectorySeparatorChar));
+            string fullPath = Path.GetFullPath(candidatePath);
+            if (!fullPath.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(fullPath, rootPath, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (parsedIndex.TryGetValue(key, out ServerState.DataEntry existing))
+            {
+                if (existing.Length > 0) totalBytes -= existing.Length;
+            }
+            else
+            {
+                fileCount++;
+            }
+
+            parsedIndex[key] = new ServerState.DataEntry
+            {
+                FilePath = fullPath,
+                ZipEntry = null,
+                Length = length
+            };
+
+            if (length > 0)
+            {
+                totalBytes += length;
+            }
+
+            if (!hasMaxZoomHeader &&
+                key.EndsWith(".terrain", StringComparison.OrdinalIgnoreCase) &&
+                TryGetZoomFromKey(key, out int zoom) &&
+                zoom > maxTerrainZoom)
+            {
+                maxTerrainZoom = zoom;
+            }
+        }
+
+        if (parsedIndex.Count == 0)
+        {
+            return false;
+        }
+
+        entryIndex = parsedIndex;
+        return true;
+    }
+
+    private static void TryWriteDirectoryManifest(
+        string sourcePath,
+        string manifestFileName,
+        Dictionary<string, ServerState.DataEntry> entryIndex,
+        int maxTerrainZoom)
+    {
+        if (string.IsNullOrWhiteSpace(sourcePath) || entryIndex == null)
+        {
+            return;
+        }
+
+        string fileName = string.IsNullOrWhiteSpace(manifestFileName) ? "_tile_index.tsv" : manifestFileName.Trim();
+        string manifestPath = Path.Combine(sourcePath, fileName);
+        if (File.Exists(manifestPath))
+        {
+            return;
+        }
+
+        try
+        {
+            using (var writer = new StreamWriter(manifestPath, append: false, Encoding.UTF8))
+            {
+                writer.WriteLine("# LocalTerrainServer manifest v1");
+                writer.WriteLine($"#maxTerrainZoom={maxTerrainZoom}");
+
+                foreach (var pair in entryIndex)
+                {
+                    string key = pair.Key;
+                    long length = pair.Value != null ? Math.Max(0, pair.Value.Length) : 0;
+                    writer.Write(key);
+                    writer.Write('\t');
+                    writer.WriteLine(length);
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"LocalTerrainServer: failed to write directory manifest in '{sourcePath}': {e.Message}");
+        }
+    }
+
+    private static string ResolveSourcePath(string sourceName)
+    {
+        if (string.IsNullOrWhiteSpace(sourceName))
+        {
+            return null;
+        }
+
+        string trimmed = sourceName.Trim();
+        if (Path.IsPathRooted(trimmed))
+        {
+            return ResolveSourcePathCandidates(trimmed);
+        }
+
+        string projectRoot = GetProjectRootPath();
+        string mapDataRoot = ResolveMapDataRoot(projectRoot);
+        string mapDataCandidate = ResolveSourcePathCandidates(Path.Combine(mapDataRoot, trimmed));
+        if (!string.IsNullOrEmpty(mapDataCandidate))
+        {
+            return mapDataCandidate;
+        }
+
+        return null;
+    }
+
+    private static string ResolveSourcePathCandidates(string candidatePath)
+    {
+        if (string.IsNullOrWhiteSpace(candidatePath))
+        {
+            return null;
+        }
+
+        string fullPath = Path.GetFullPath(candidatePath);
+        string extension = Path.GetExtension(fullPath);
+
+        // If a zip path is configured, prefer an extracted sibling folder first.
+        if (string.Equals(extension, ".zip", StringComparison.OrdinalIgnoreCase))
+        {
+            string folderPath = fullPath.Substring(0, fullPath.Length - 4);
+            if (Directory.Exists(folderPath))
+            {
+                return folderPath;
+            }
+
+            if (File.Exists(fullPath))
+            {
+                return fullPath;
+            }
+
+            if (Directory.Exists(fullPath))
+            {
+                return fullPath;
+            }
+
+            return null;
+        }
+
+        if (Directory.Exists(fullPath))
+        {
+            return fullPath;
+        }
+
+        // If no extension was provided (e.g. "heightmap"), try "<name>.zip" second.
+        if (string.IsNullOrEmpty(extension))
+        {
+            string zipPath = fullPath + ".zip";
+            if (File.Exists(zipPath))
+            {
+                return zipPath;
+            }
+        }
+
+        if (File.Exists(fullPath))
+        {
+            return fullPath;
+        }
+
+        return null;
+    }
+
+    private static string ResolveMapDataRoot(string projectRoot)
+    {
+        if (string.IsNullOrWhiteSpace(projectRoot))
+        {
+            return Path.Combine(Directory.GetCurrentDirectory(), "MapData");
+        }
+
+        string exactPath = Path.Combine(projectRoot, "MapData");
+        if (Directory.Exists(exactPath))
+        {
+            return exactPath;
+        }
+
+        try
+        {
+            foreach (string directoryPath in Directory.EnumerateDirectories(projectRoot))
+            {
+                string directoryName = Path.GetFileName(directoryPath);
+                if (string.Equals(directoryName, "MapData", StringComparison.OrdinalIgnoreCase))
+                {
+                    return directoryPath;
+                }
+            }
+        }
+        catch
+        {
+            // Fall back to the conventional MapData path if enumeration fails.
+        }
+
+        return exactPath;
+    }
+
+    private static string GetProjectRootPath()
+    {
+        string dataPath = Application.dataPath;
+        if (string.IsNullOrEmpty(dataPath))
+        {
+            return Directory.GetCurrentDirectory();
+        }
+
+        DirectoryInfo parent = Directory.GetParent(dataPath);
+        return parent != null ? parent.FullName : dataPath;
+    }
+
+    private static string GetDirectoryEntryKey(string rootDirectoryPath, string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(rootDirectoryPath) || string.IsNullOrWhiteSpace(filePath))
+        {
+            return string.Empty;
+        }
+
+        string root = rootDirectoryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string fullFile = Path.GetFullPath(filePath);
+        if (!fullFile.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        string relative = fullFile.Substring(root.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return NormalizeKey(relative);
     }
 
     private void ListenLoop(ServerState server)
@@ -606,12 +1021,23 @@ public class LocalTerrainServer : MonoBehaviour
         data = null;
 
         var entryIndex = server.EntryIndex;
-        if (entryIndex == null || !entryIndex.TryGetValue(key, out ZipArchiveEntry entry))
+        if (entryIndex == null || !entryIndex.TryGetValue(key, out ServerState.DataEntry entry))
         {
             return false;
         }
 
-        data = ReadEntryData(entry);
+        if (entry.ZipEntry != null)
+        {
+            data = ReadEntryData(entry.ZipEntry);
+            return true;
+        }
+
+        if (string.IsNullOrEmpty(entry.FilePath) || !File.Exists(entry.FilePath))
+        {
+            return false;
+        }
+
+        data = File.ReadAllBytes(entry.FilePath);
         return true;
     }
 

@@ -221,10 +221,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LocalTerrainServer
   port: 8080
-  archiveName: heightmap.zip
+  archiveName: heightmap
   loadSecondaryArchive: 1
   secondaryPort: 8081
-  secondaryArchiveName: terrain.zip
+  secondaryArchiveName: terrain
+  useDirectoryManifestIndex: 1
+  directoryManifestFileName: manifest.tsv
+  writeDirectoryManifestWhenMissing: 1
+  maxCachedTilesPerServer: 512
   maxMissingRequestLogs: 20
   logMissingRequests: 0
 --- !u!4 &857150675
@@ -370,7 +374,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1239673844}
   serializedVersion: 2
-  m_LocalRotation: {x: -1.3877788e-17, y: 7.260839e-18, z: 9.030154e-19, w: 1}
+  m_LocalRotation: {x: -1.3877788e-17, y: 7.260868e-18, z: 9.029917e-19, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1.0000004, z: 1}
   m_ConstrainProportionsScale: 0
@@ -546,7 +550,7 @@ MonoBehaviour:
     c0:
       x: 0.9647534819407176
       y: -0.26315531361395944
-      z: -0.00000000000000001001247237958696
+      z: -0.000000000000000010012620441901117
       w: 0
     c1:
       x: -0.20236462269578312

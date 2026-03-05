@@ -2,3 +2,5 @@
 .vsconfig
 .vscode/
 *.slnx
+**/heightmap/
+**/terrain/
