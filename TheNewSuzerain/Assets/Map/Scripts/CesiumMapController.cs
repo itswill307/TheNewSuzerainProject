@@ -10,7 +10,6 @@ public class CesiumMapController : MonoBehaviour
 {
     [Header("Cesium")]
     [SerializeField] CesiumGeoreference georeference;
-    [SerializeField] bool disableDefaultCesiumCameraController = true;
     [SerializeField] bool initializeFromCurrentView = true;
 
     [Header("Focus")]
@@ -69,6 +68,9 @@ public class CesiumMapController : MonoBehaviour
 
     float orbitYawDeg;
     float orbitPitchDeg;
+    bool wasMiddleMouseHeld;
+    bool hasPanAnchor;
+    double3 panAnchorEcef;
 
     int lastScreenWidth;
     int lastScreenHeight;
@@ -99,15 +101,6 @@ public class CesiumMapController : MonoBehaviour
 
         globeAnchor.detectTransformChanges = false;
         globeAnchor.adjustOrientationForGlobeWhenMoving = false;
-
-        if (disableDefaultCesiumCameraController)
-        {
-            CesiumCameraController defaultController = GetComponent<CesiumCameraController>();
-            if (defaultController != null)
-            {
-                defaultController.enabled = false;
-            }
-        }
 
         if (initializeFromCurrentView && TryInitializeFromCurrentView())
         {
@@ -144,6 +137,9 @@ public class CesiumMapController : MonoBehaviour
         {
             input?.Disable();
         }
+
+        wasMiddleMouseHeld = false;
+        hasPanAnchor = false;
     }
 
     void Update()
@@ -204,14 +200,44 @@ public class CesiumMapController : MonoBehaviour
         Vector2 moveKeys = input.Map.Move.ReadValue<Vector2>();
         Vector2 dragPan = input.Map.DragPan.ReadValue<Vector2>();
         Vector2 cursorPos = input.Map.Point.ReadValue<Vector2>();
+        bool middleMouseHeld = Mouse.current?.middleButton.isPressed ?? false;
+        bool cursorOverGlobe = TryIntersectEllipsoid(cam.ScreenPointToRay(cursorPos), out _);
+
+        if (middleMouseHeld && !wasMiddleMouseHeld)
+        {
+            TryBeginPanAnchor(cursorPos);
+        }
+        else if (middleMouseHeld && !hasPanAnchor)
+        {
+            TryBeginPanAnchor(cursorPos);
+        }
+        else if (!middleMouseHeld)
+        {
+            hasPanAnchor = false;
+        }
+
+        wasMiddleMouseHeld = middleMouseHeld;
 
         GetFallbackPanDegreesPerPixel(out float degreesPerPixelX, out float degreesPerPixelY);
-        TryGetCenterPanDegreesPerPixel(ref degreesPerPixelX, ref degreesPerPixelY);
+        TryGetPanDegreesPerPixelAtScreen(
+            new Vector2(Screen.width * 0.5f, Screen.height * 0.5f),
+            ref degreesPerPixelX,
+            ref degreesPerPixelY);
 
         double panLon = moveKeys.x * panKeySpeed * degreesPerPixelX * Time.deltaTime;
         double panLat = moveKeys.y * panKeySpeed * degreesPerPixelY * Time.deltaTime;
 
-        if (dragPan.sqrMagnitude > 0f)
+        if (middleMouseHeld && cursorOverGlobe && hasPanAnchor && TryGetScreenPositionForEcef(panAnchorEcef, out Vector2 anchorScreenPos))
+        {
+            float anchorDegreesPerPixelX = degreesPerPixelX;
+            float anchorDegreesPerPixelY = degreesPerPixelY;
+            TryGetPanDegreesPerPixelAtScreen(anchorScreenPos, ref anchorDegreesPerPixelX, ref anchorDegreesPerPixelY);
+
+            Vector2 screenError = cursorPos - anchorScreenPos;
+            panLon += -screenError.x * anchorDegreesPerPixelX * panDragSpeed;
+            panLat += -screenError.y * anchorDegreesPerPixelY * panDragSpeed;
+        }
+        else if (middleMouseHeld && cursorOverGlobe && dragPan.sqrMagnitude > 0f)
         {
             Vector2 prevCursorPos = cursorPos - dragPan;
             if (TryGetLongitudeLatitudeAtScreen(cursorPos, out double lonNow, out double latNow) &&
@@ -238,8 +264,8 @@ public class CesiumMapController : MonoBehaviour
 
         if (rmbHeld)
         {
-            orbitYawDeg = Mathf.Clamp(orbitYawDeg + rotateDelta.x * rotateSensitivity, minYawDeg, maxYawDeg);
-            orbitPitchDeg = Mathf.Clamp(orbitPitchDeg + rotateDelta.y * rotateSensitivity, minPitchDeg, maxPitchDeg);
+            orbitYawDeg = Mathf.Clamp(orbitYawDeg - rotateDelta.x * rotateSensitivity, minYawDeg, maxYawDeg);
+            orbitPitchDeg = Mathf.Clamp(orbitPitchDeg - rotateDelta.y * rotateSensitivity, minPitchDeg, maxPitchDeg);
             return;
         }
 
@@ -424,14 +450,34 @@ public class CesiumMapController : MonoBehaviour
         return true;
     }
 
-    bool TryGetCenterPanDegreesPerPixel(ref float degreesPerPixelX, ref float degreesPerPixelY)
+    void TryBeginPanAnchor(Vector2 screenPos)
+    {
+        hasPanAnchor = TryIntersectEllipsoid(cam.ScreenPointToRay(screenPos), out panAnchorEcef);
+    }
+
+    bool TryGetScreenPositionForEcef(double3 ecef, out Vector2 screenPos)
+    {
+        double3 unityLocal = georeference.TransformEarthCenteredEarthFixedPositionToUnity(ecef);
+        Vector3 unityWorld = georeference.transform.TransformPoint(ToVector3(unityLocal));
+        Vector3 projected = cam.WorldToScreenPoint(unityWorld);
+
+        if (projected.z <= 0f)
+        {
+            screenPos = default;
+            return false;
+        }
+
+        screenPos = new Vector2(projected.x, projected.y);
+        return true;
+    }
+
+    bool TryGetPanDegreesPerPixelAtScreen(Vector2 screenPos, ref float degreesPerPixelX, ref float degreesPerPixelY)
     {
         const float sampleStepPixels = 12f;
-        Vector2 center = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
-        Vector2 right = center + new Vector2(sampleStepPixels, 0f);
-        Vector2 up = center + new Vector2(0f, sampleStepPixels);
+        Vector2 right = screenPos + new Vector2(sampleStepPixels, 0f);
+        Vector2 up = screenPos + new Vector2(0f, sampleStepPixels);
 
-        if (!TryGetLongitudeLatitudeAtScreen(center, out double lonCenter, out double latCenter) ||
+        if (!TryGetLongitudeLatitudeAtScreen(screenPos, out double lonCenter, out double latCenter) ||
             !TryGetLongitudeLatitudeAtScreen(right, out double lonRight, out _) ||
             !TryGetLongitudeLatitudeAtScreen(up, out _, out double latUp))
         {

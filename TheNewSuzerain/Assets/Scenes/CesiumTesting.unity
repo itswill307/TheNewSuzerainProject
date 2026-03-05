@@ -258,7 +258,7 @@ GameObject:
   - component: {fileID: 1053519190}
   - component: {fileID: 1053519191}
   m_Layer: 0
-  m_Name: CesiumTileset
+  m_Name: CesiumCustomTileset
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -320,7 +320,7 @@ MonoBehaviour:
   _showTilesInHierarchy: 0
   _updateInEditor: 1
   _logSelectionStats: 0
-  _createPhysicsMeshes: 1
+  _createPhysicsMeshes: 0
 --- !u!114 &1053519191
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -354,14 +354,12 @@ GameObject:
   - component: {fileID: 1239673845}
   - component: {fileID: 1239673852}
   - component: {fileID: 1239673851}
-  - component: {fileID: 1239673850}
   - component: {fileID: 1239673849}
   - component: {fileID: 1239673848}
-  - component: {fileID: 1239673847}
   - component: {fileID: 1239673846}
   - component: {fileID: 1239673853}
   m_Layer: 0
-  m_Name: DynamicCamera
+  m_Name: CustomCamera
   m_TagString: MainCamera
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -375,7 +373,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1239673844}
   serializedVersion: 2
-  m_LocalRotation: {x: -1.3877788e-17, y: 6.222506e-18, z: 1.7661737e-18, w: 1}
+  m_LocalRotation: {x: -1.3877788e-17, y: 6.386666e-18, z: 1.6297085e-18, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1.0000004, z: 1}
   m_ConstrainProportionsScale: 0
@@ -426,100 +424,6 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
---- !u!114 &1239673847
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1239673844}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 275ecd2d59d942d41bf31252981978e0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _flyToAltitudeProfileCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 4.76524
-      outSlope: 4.76524
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0.061909087
-    - serializedVersion: 3
-      time: 0.5
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 34
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    - serializedVersion: 3
-      time: 1
-      value: 0
-      inSlope: -4.821313
-      outSlope: -4.821313
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.0535717
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  _flyToProgressCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  _flyToMaximumAltitudeCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0.16666667
-      outSlope: 0.16666667
-      tangentMode: 34
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0.33333334
-    - serializedVersion: 3
-      time: 12000000
-      value: 2000000
-      inSlope: 0.16666667
-      outSlope: 0.16666667
-      tangentMode: 34
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  _flyToDuration: 5
 --- !u!114 &1239673848
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -551,7 +455,7 @@ MonoBehaviour:
     c0:
       x: 0.9647534819407176
       y: -0.26315531361395944
-      z: -6.885089498589049e-18
+      z: -7.738988031082643e-18
       w: 0
     c1:
       x: -0.20236462269578312
@@ -569,97 +473,6 @@ MonoBehaviour:
       z: 4056960.1513377777
       w: 1
   _localToGlobeFixedMatrixIsValid: 1
---- !u!114 &1239673850
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1239673844}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6b621ff6a9d4b8c4d85ac07de7f8b4b9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _enableMovement: 1
-  _enableRotation: 1
-  _defaultMaximumSpeed: 100
-  _enableDynamicSpeed: 1
-  _dynamicSpeedMinHeight: 20
-  _enableDynamicClippingPlanes: 1
-  _dynamicClippingPlanesMinHeight: 10000
-  _lookAction:
-    m_UseReference: 0
-    m_Action:
-      m_Name: Look
-      m_Type: 0
-      m_ExpectedControlType: 
-      m_Id: 7e2435bf-dc2f-4206-84fb-becc2e26cef1
-      m_Processors: 
-      m_Interactions: 
-      m_SingletonActionBindings: []
-      m_Flags: 0
-    m_Reference: {fileID: 0}
-  _moveAction:
-    m_UseReference: 0
-    m_Action:
-      m_Name: Move
-      m_Type: 0
-      m_ExpectedControlType: 
-      m_Id: 78b142c1-0d88-4d4f-9516-fa6e43b7b2cd
-      m_Processors: 
-      m_Interactions: 
-      m_SingletonActionBindings: []
-      m_Flags: 0
-    m_Reference: {fileID: 0}
-  _moveUpAction:
-    m_UseReference: 0
-    m_Action:
-      m_Name: Move Up
-      m_Type: 0
-      m_ExpectedControlType: 
-      m_Id: 75bc77db-2762-42ab-a6a4-74d3fcfb864c
-      m_Processors: 
-      m_Interactions: 
-      m_SingletonActionBindings: []
-      m_Flags: 0
-    m_Reference: {fileID: 0}
-  _speedChangeAction:
-    m_UseReference: 0
-    m_Action:
-      m_Name: Speed Change
-      m_Type: 0
-      m_ExpectedControlType: 
-      m_Id: b215aa93-2f3a-41d3-a9fa-2e3c2dd074d8
-      m_Processors: 
-      m_Interactions: 
-      m_SingletonActionBindings: []
-      m_Flags: 0
-    m_Reference: {fileID: 0}
-  _speedResetAction:
-    m_UseReference: 0
-    m_Action:
-      m_Name: Speed Reset
-      m_Type: 0
-      m_ExpectedControlType: 
-      m_Id: c4dc8b71-2fa2-4f37-8b7d-22217702aa47
-      m_Processors: 
-      m_Interactions: 
-      m_SingletonActionBindings: []
-      m_Flags: 0
-    m_Reference: {fileID: 0}
-  _toggleDynamicSpeedAction:
-    m_UseReference: 0
-    m_Action:
-      m_Name: Toggle Dynamic Speed
-      m_Type: 0
-      m_ExpectedControlType: 
-      m_Id: 3bcc64da-b737-4efe-8a6b-7c3811c7ff67
-      m_Processors: 
-      m_Interactions: 
-      m_SingletonActionBindings: []
-      m_Flags: 0
-    m_Reference: {fileID: 0}
 --- !u!81 &1239673851
 AudioListener:
   m_ObjectHideFlags: 0
@@ -732,7 +545,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CesiumMapController
   georeference: {fileID: 663349083}
-  disableDefaultCesiumCameraController: 1
   initializeFromCurrentView: 1
   focusLongitudeDeg: 0
   focusLatitudeDeg: 0
@@ -757,11 +569,11 @@ MonoBehaviour:
   maxNearToFarRatio: 100000
   panKeySpeed: 800
   panDragSpeed: 1
-  rotateSensitivity: 0.14
-  minPitchDeg: -35
-  maxPitchDeg: 35
-  minYawDeg: -35
-  maxYawDeg: 35
+  rotateSensitivity: 0.25
+  minPitchDeg: -85
+  maxPitchDeg: 85
+  minYawDeg: -85
+  maxYawDeg: 85
   returnToDefaultSpeed: 320
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

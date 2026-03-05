@@ -78,6 +78,9 @@ public class MapControllerEqr : MonoBehaviour
     // Orbit state (right-mouse drag)
     float orbitYawDeg = 0f;
     float orbitPitchDeg = 0f;
+    bool wasMiddleMouseHeld;
+    bool hasPanAnchor;
+    Vector2 panAnchorUv;
 
     // Cached latitude limits
     float cachedMinLatLimit = -90f;
@@ -128,6 +131,9 @@ public class MapControllerEqr : MonoBehaviour
         {
             input.Disable();
         }
+
+        wasMiddleMouseHeld = false;
+        hasPanAnchor = false;
     }
 
     void CalculateZoomLimits()
@@ -390,6 +396,23 @@ public class MapControllerEqr : MonoBehaviour
         Vector2 moveKeys = input.Map.Move.ReadValue<Vector2>();
         Vector2 dragPan = input.Map.DragPan.ReadValue<Vector2>();
         Vector2 cursorPos = input.Map.Point.ReadValue<Vector2>();
+        bool middleMouseHeld = Mouse.current?.middleButton.isPressed ?? false;
+        bool cursorOverMap = TryGetUVAtScreen(cursorPos, out _);
+
+        if (middleMouseHeld && !wasMiddleMouseHeld)
+        {
+            TryBeginPanAnchor(cursorPos);
+        }
+        else if (middleMouseHeld && !hasPanAnchor && cursorOverMap)
+        {
+            TryBeginPanAnchor(cursorPos);
+        }
+        else if (!middleMouseHeld)
+        {
+            hasPanAnchor = false;
+        }
+
+        wasMiddleMouseHeld = middleMouseHeld;
 
         float verticalFovRad = cam.fieldOfView * Mathf.Deg2Rad;
         float horizontalFovRad = 2f * Mathf.Atan(Mathf.Tan(verticalFovRad * 0.5f) * cam.aspect);
@@ -402,7 +425,10 @@ public class MapControllerEqr : MonoBehaviour
         widthFactor = Mathf.Max(0.01f, widthFactor);
         float degreesPerPixelX = (worldUnitsPerPixelX / (mapWidth * widthFactor)) * 360f;
 
-        if (TryGetCenterPanDegreesPerPixel(out float sampledDegreesPerPixelX, out float sampledDegreesPerPixelY))
+        if (TryGetPanDegreesPerPixelAtScreen(
+            new Vector2(Screen.width * 0.5f, Screen.height * 0.5f),
+            out float sampledDegreesPerPixelX,
+            out float sampledDegreesPerPixelY))
         {
             degreesPerPixelX = sampledDegreesPerPixelX;
             degreesPerPixelY = sampledDegreesPerPixelY;
@@ -412,7 +438,21 @@ public class MapControllerEqr : MonoBehaviour
         float panLon = moveKeys.x * panKeySpeed * degreesPerPixelX * Time.deltaTime;
         float panLat = moveKeys.y * panKeySpeed * degreesPerPixelY * Time.deltaTime;
 
-        if (dragPan.sqrMagnitude > 0.0f && mapRenderer != null)
+        if (middleMouseHeld && cursorOverMap && hasPanAnchor && TryGetScreenPositionForUV(panAnchorUv, out Vector2 anchorScreenPos))
+        {
+            float anchorDegreesPerPixelX = degreesPerPixelX;
+            float anchorDegreesPerPixelY = degreesPerPixelY;
+            if (TryGetPanDegreesPerPixelAtScreen(anchorScreenPos, out float sampledAnchorDegreesPerPixelX, out float sampledAnchorDegreesPerPixelY))
+            {
+                anchorDegreesPerPixelX = sampledAnchorDegreesPerPixelX;
+                anchorDegreesPerPixelY = sampledAnchorDegreesPerPixelY;
+            }
+
+            Vector2 screenError = cursorPos - anchorScreenPos;
+            panLon += -screenError.x * anchorDegreesPerPixelX * panDragSpeed;
+            panLat += -screenError.y * anchorDegreesPerPixelY * panDragSpeed;
+        }
+        else if (middleMouseHeld && cursorOverMap && dragPan.sqrMagnitude > 0.0f && mapRenderer != null)
         {
             Vector2 prevCursorPos = cursorPos - dragPan;
             if (TryGetUVAtScreen(cursorPos, out Vector2 uvNow) &&
@@ -584,6 +624,45 @@ public class MapControllerEqr : MonoBehaviour
         return true;
     }
 
+    void TryBeginPanAnchor(Vector2 screenPos)
+    {
+        hasPanAnchor = TryGetUVAtScreen(screenPos, out panAnchorUv);
+    }
+
+    bool TryGetScreenPositionForUV(Vector2 uv, out Vector2 screenPos)
+    {
+        screenPos = default;
+        if (mapRenderer == null || cam == null) return false;
+
+        Vector3 localPoint;
+        if (sphereMode)
+        {
+            float lon = (uv.x - 0.5f) * 2f * Mathf.PI;
+            float lat = (uv.y - 0.5f) * Mathf.PI;
+            float cosLat = Mathf.Cos(lat);
+            localPoint = new Vector3(
+                cosLat * Mathf.Cos(lon) * radius,
+                Mathf.Sin(lat) * radius,
+                cosLat * Mathf.Sin(lon) * radius
+            );
+        }
+        else
+        {
+            float geoLonDeg = (uv.x - 0.5f) * 360f;
+            float lon = Mathf.DeltaAngle(GetFocusLongitudeDeg(), geoLonDeg) * Mathf.Deg2Rad;
+            float lat = (uv.y - 0.5f) * Mathf.PI;
+            Vector2 projectedPoint = ProjectAitoffBlended(lat, lon, currentMorph);
+            localPoint = new Vector3(projectedPoint.x, projectedPoint.y, 0f);
+        }
+
+        Vector3 worldPoint = mapRenderer.transform.TransformPoint(localPoint);
+        Vector3 projected = cam.WorldToScreenPoint(worldPoint);
+        if (projected.z <= 0f) return false;
+
+        screenPos = new Vector2(projected.x, projected.y);
+        return true;
+    }
+
     bool TryGetUVAtScreen(Vector2 screenPos, out Vector2 uv)
     {
         uv = default;
@@ -622,21 +701,26 @@ public class MapControllerEqr : MonoBehaviour
 
         Vector3 planeHitPoint = rayOriginOS + rayDirOS * planeHitDistance;
 
-        return TryProjectUVFromAitoff(planeHitPoint, out uv);
+        if (!TryProjectUVFromAitoff(planeHitPoint, out uv))
+        {
+            return false;
+        }
+
+        uv.x = Mathf.Repeat(uv.x + (focusLon / 360f), 1f);
+        return true;
     }
 
-    bool TryGetCenterPanDegreesPerPixel(out float degreesPerPixelX, out float degreesPerPixelY)
+    bool TryGetPanDegreesPerPixelAtScreen(Vector2 screenPos, out float degreesPerPixelX, out float degreesPerPixelY)
     {
         degreesPerPixelX = 0f;
         degreesPerPixelY = 0f;
         if (cam == null) return false;
 
         const float sampleStepPixels = 12f;
-        Vector2 center = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
-        Vector2 right = center + new Vector2(sampleStepPixels, 0f);
-        Vector2 up = center + new Vector2(0f, sampleStepPixels);
+        Vector2 right = screenPos + new Vector2(sampleStepPixels, 0f);
+        Vector2 up = screenPos + new Vector2(0f, sampleStepPixels);
 
-        if (!TryGetUVAtScreen(center, out Vector2 uvCenter))
+        if (!TryGetUVAtScreen(screenPos, out Vector2 uvCenter))
         {
             return false;
         }
