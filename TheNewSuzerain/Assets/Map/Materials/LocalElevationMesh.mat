@@ -122,14 +122,14 @@ Material:
     - _KmPerUnit: 1
     - _MainTexIndexedSRGB: 0
     - _Metallic: 0
-    - _Morph: 0.8921301
+    - _Morph: 0.9981872
     - _OcclusionStrength: 1
     - _Parallax: 0.005
-    - _PatchCenterLatDeg: 41.960423
-    - _PatchCenterLonDeg: 3.2218475
+    - _PatchCenterLatDeg: 27.855246
+    - _PatchCenterLonDeg: 82.53027
     - _PatchEdgeFade: 0.06
     - _PatchSpanLatDeg: 1.7986407
-    - _PatchSpanLonDeg: 4.837612
+    - _PatchSpanLonDeg: 4.0687203
     - _PatchSurfaceBiasUnits: 0.25
     - _QueueOffset: 0
     - _Radius: 6371.009
@@ -153,7 +153,7 @@ Material:
     - _HighlightColor: {r: 1, g: 0.75, b: 0, a: 0.6}
     - _HoverColor: {r: 0, g: 1, b: 1, a: 0.5}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _UVOffset: {r: 0.008953006, g: 0, b: 0, a: 0}
+    - _UVOffset: {r: 0.22925085, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!114 &7591157823099383982

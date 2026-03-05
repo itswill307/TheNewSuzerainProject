@@ -131,11 +131,11 @@ Material:
     - _HeightScale: 0
     - _HoverID: -1
     - _KmPerUnit: 1
-    - _LocalPatchCenterLatDeg: 41.960423
-    - _LocalPatchCenterLonDeg: 3.2218475
+    - _LocalPatchCenterLatDeg: 27.855246
+    - _LocalPatchCenterLonDeg: 82.53027
     - _LocalPatchMaskEnable: 0
     - _LocalPatchSpanLatDeg: 1.7986407
-    - _LocalPatchSpanLonDeg: 4.837612
+    - _LocalPatchSpanLonDeg: 4.0687203
     - _MainTexIndexedSRGB: 0
     - _Metallic: 0
     - _MinBrightness: 0.25

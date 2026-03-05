@@ -359,6 +359,7 @@ GameObject:
   - component: {fileID: 1239673848}
   - component: {fileID: 1239673847}
   - component: {fileID: 1239673846}
+  - component: {fileID: 1239673853}
   m_Layer: 0
   m_Name: DynamicCamera
   m_TagString: MainCamera
@@ -374,7 +375,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1239673844}
   serializedVersion: 2
-  m_LocalRotation: {x: -1.3877788e-17, y: 7.260868e-18, z: 9.029917e-19, w: 1}
+  m_LocalRotation: {x: -1.3877788e-17, y: 6.222506e-18, z: 1.7661737e-18, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1.0000004, z: 1}
   m_ConstrainProportionsScale: 0
@@ -432,7 +433,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1239673844}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 275ecd2d59d942d41bf31252981978e0, type: 3}
   m_Name: 
@@ -550,7 +551,7 @@ MonoBehaviour:
     c0:
       x: 0.9647534819407176
       y: -0.26315531361395944
-      z: -0.000000000000000010012620441901117
+      z: -6.885089498589049e-18
       w: 0
     c1:
       x: -0.20236462269578312
@@ -575,7 +576,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1239673844}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6b621ff6a9d4b8c4d85ac07de7f8b4b9, type: 3}
   m_Name: 
@@ -590,7 +591,7 @@ MonoBehaviour:
   _lookAction:
     m_UseReference: 0
     m_Action:
-      m_Name: 
+      m_Name: Look
       m_Type: 0
       m_ExpectedControlType: 
       m_Id: 7e2435bf-dc2f-4206-84fb-becc2e26cef1
@@ -602,7 +603,7 @@ MonoBehaviour:
   _moveAction:
     m_UseReference: 0
     m_Action:
-      m_Name: 
+      m_Name: Move
       m_Type: 0
       m_ExpectedControlType: 
       m_Id: 78b142c1-0d88-4d4f-9516-fa6e43b7b2cd
@@ -614,7 +615,7 @@ MonoBehaviour:
   _moveUpAction:
     m_UseReference: 0
     m_Action:
-      m_Name: 
+      m_Name: Move Up
       m_Type: 0
       m_ExpectedControlType: 
       m_Id: 75bc77db-2762-42ab-a6a4-74d3fcfb864c
@@ -626,7 +627,7 @@ MonoBehaviour:
   _speedChangeAction:
     m_UseReference: 0
     m_Action:
-      m_Name: 
+      m_Name: Speed Change
       m_Type: 0
       m_ExpectedControlType: 
       m_Id: b215aa93-2f3a-41d3-a9fa-2e3c2dd074d8
@@ -638,7 +639,7 @@ MonoBehaviour:
   _speedResetAction:
     m_UseReference: 0
     m_Action:
-      m_Name: 
+      m_Name: Speed Reset
       m_Type: 0
       m_ExpectedControlType: 
       m_Id: c4dc8b71-2fa2-4f37-8b7d-22217702aa47
@@ -650,7 +651,7 @@ MonoBehaviour:
   _toggleDynamicSpeedAction:
     m_UseReference: 0
     m_Action:
-      m_Name: 
+      m_Name: Toggle Dynamic Speed
       m_Type: 0
       m_ExpectedControlType: 
       m_Id: 3bcc64da-b737-4efe-8a6b-7c3811c7ff67
@@ -718,6 +719,50 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
+--- !u!114 &1239673853
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1239673844}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40f0829ad76b546b0aa3ba01bd375b28, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CesiumMapController
+  georeference: {fileID: 663349083}
+  disableDefaultCesiumCameraController: 1
+  initializeFromCurrentView: 1
+  focusLongitudeDeg: 0
+  focusLatitudeDeg: 0
+  focusHeightMeters: 0
+  minLatitudeDeg: -85
+  maxLatitudeDeg: 85
+  zoomSpeed: 0.002
+  dynamicZoomSpeed: 1
+  minDynamicZoomAltitudeMeters: 200
+  maxDynamicZoomAltitudeMeters: 3000000
+  minZoomSpeedScale: 0.5
+  maxZoomSpeedScale: 1.6
+  minZoomDistanceMeters: 100
+  zoomInBufferMeters: 25
+  initialZoomDistanceMeters: 0
+  autoFarClip: 1
+  autoNearClip: 1
+  farClipPaddingMeters: 50000
+  minFarClip: 200000
+  maxFarClip: 50000000
+  maxNearClip: 1000
+  maxNearToFarRatio: 100000
+  panKeySpeed: 800
+  panDragSpeed: 1
+  rotateSensitivity: 0.14
+  minPitchDeg: -35
+  maxPitchDeg: 35
+  minYawDeg: -35
+  maxYawDeg: 35
+  returnToDefaultSpeed: 320
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
