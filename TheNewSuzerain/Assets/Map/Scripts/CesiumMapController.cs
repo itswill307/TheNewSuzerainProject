@@ -10,7 +10,7 @@ public class CesiumMapController : MonoBehaviour
 {
     [Header("Cesium")]
     [SerializeField] CesiumGeoreference georeference;
-    [SerializeField] bool initializeFromCurrentView = true;
+    [SerializeField] bool initializeFromCurrentView = false;
 
     [Header("Focus")]
     [SerializeField] double focusLongitudeDeg = 0.0;
@@ -21,12 +21,12 @@ public class CesiumMapController : MonoBehaviour
 
     [Header("Zoom")]
     [SerializeField, Tooltip("Base exponential scroll sensitivity.")]
-    float zoomSpeed = 0.002f;
+    float zoomSpeed = 0.012f;
     [SerializeField] bool dynamicZoomSpeed = true;
     [SerializeField] float minDynamicZoomAltitudeMeters = 200f;
     [SerializeField] float maxDynamicZoomAltitudeMeters = 3_000_000f;
-    [SerializeField] float minZoomSpeedScale = 0.5f;
-    [SerializeField] float maxZoomSpeedScale = 1.6f;
+    [SerializeField] float minZoomSpeedScale = 1.0f;
+    [SerializeField] float maxZoomSpeedScale = 3.0f;
     [SerializeField] float minZoomDistanceMeters = 100f;
     [SerializeField] float zoomInBufferMeters = 25f;
     [SerializeField] float initialZoomDistanceMeters = 0f;
@@ -47,11 +47,11 @@ public class CesiumMapController : MonoBehaviour
 
     [Header("Rotation")]
     [SerializeField, Tooltip("Degrees of tilt per pixel when rotating with RMB.")]
-    float rotateSensitivity = 0.14f;
-    [SerializeField] float minPitchDeg = -35f;
-    [SerializeField] float maxPitchDeg = 35f;
-    [SerializeField] float minYawDeg = -35f;
-    [SerializeField] float maxYawDeg = 35f;
+    float rotateSensitivity = 0.25f;
+    [SerializeField] float minPitchDeg = -85f;
+    [SerializeField] float maxPitchDeg = 85f;
+    [SerializeField] float minYawDeg = -85f;
+    [SerializeField] float maxYawDeg = 85f;
     [SerializeField] float returnToDefaultSpeed = 320f;
 
     Camera cam;
@@ -620,6 +620,128 @@ public class CesiumMapController : MonoBehaviour
     static quaternion ToQuaternion(Quaternion value)
     {
         return new quaternion(value.x, value.y, value.z, value.w);
+    }
+
+    public MapCesiumTransitionViewState CaptureTransitionViewState()
+    {
+        if (!EnsureInitialized())
+        {
+            return default;
+        }
+
+        GetFallbackPanDegreesPerPixel(out float degreesPerPixelX, out float degreesPerPixelY);
+        TryGetPanDegreesPerPixelAtScreen(
+            new Vector2(Screen.width * 0.5f, Screen.height * 0.5f),
+            ref degreesPerPixelX,
+            ref degreesPerPixelY);
+
+        return new MapCesiumTransitionViewState
+        {
+            isValid = true,
+            focusLongitudeDeg = focusLongitudeDeg,
+            focusLatitudeDeg = focusLatitudeDeg,
+            focusHeightMeters = focusHeightMeters,
+            orbitYawDeg = orbitYawDeg,
+            orbitPitchDeg = orbitPitchDeg,
+            fieldOfViewDeg = cam.fieldOfView,
+            visibleLongitudeSpanDeg = Mathf.Abs(degreesPerPixelX) * Mathf.Max(1, Screen.width),
+            visibleLatitudeSpanDeg = Mathf.Abs(degreesPerPixelY) * Mathf.Max(1, Screen.height)
+        };
+    }
+
+    public void ApplyTransitionViewState(MapCesiumTransitionViewState state)
+    {
+        if (!state.isValid || !EnsureInitialized())
+        {
+            return;
+        }
+
+        cam.fieldOfView = Mathf.Clamp(state.fieldOfViewDeg, 1f, 179f);
+        CacheCameraShape();
+
+        focusLongitudeDeg = WrapLongitude(state.focusLongitudeDeg);
+        focusLatitudeDeg = math.clamp(state.focusLatitudeDeg, minLatitudeDeg, maxLatitudeDeg);
+        focusHeightMeters = math.max(0.0, state.focusHeightMeters);
+        orbitYawDeg = Mathf.Clamp(state.orbitYawDeg, minYawDeg, maxYawDeg);
+        orbitPitchDeg = Mathf.Clamp(state.orbitPitchDeg, minPitchDeg, maxPitchDeg);
+
+        UpdateZoomLimits();
+        currentDistanceMeters = CalculateDistanceFromVisibleSpan(
+            (float)focusLatitudeDeg,
+            state.visibleLongitudeSpanDeg,
+            state.visibleLatitudeSpanDeg);
+        currentDistanceMeters = Mathf.Clamp(currentDistanceMeters, minZoomDistance, maxZoomDistance);
+
+        ApplyCameraPose();
+    }
+
+    public Camera ControlledCamera => cam != null ? cam : GetComponent<Camera>();
+    public double FocusLongitudeDeg => focusLongitudeDeg;
+    public double FocusLatitudeDeg => focusLatitudeDeg;
+    public double FocusHeightMeters => focusHeightMeters;
+    public float CurrentDistanceMeters => currentDistanceMeters;
+    public float OrbitYawDeg => orbitYawDeg;
+    public float OrbitPitchDeg => orbitPitchDeg;
+
+    bool EnsureInitialized()
+    {
+        cam = cam != null ? cam : GetComponent<Camera>();
+        globeAnchor = globeAnchor != null ? globeAnchor : GetComponent<CesiumGlobeAnchor>();
+        georeference = georeference != null ? georeference : GetComponentInParent<CesiumGeoreference>();
+        if (cam == null || globeAnchor == null || georeference == null)
+        {
+            return false;
+        }
+
+        georeference.Initialize();
+        ellipsoid = georeference.ellipsoid;
+        ellipsoidRadii = ellipsoid.GetRadii();
+        maxEllipsoidRadius = ellipsoid.GetMaximumRadius();
+        globeAnchor.detectTransformChanges = false;
+        globeAnchor.adjustOrientationForGlobeWhenMoving = false;
+
+        if (input == null)
+        {
+            input = new InputSystem_Actions();
+        }
+
+        if (initialNearClipPlane <= 0f)
+        {
+            initialNearClipPlane = cam.nearClipPlane;
+        }
+
+        if (initialFarClipPlane <= 0f)
+        {
+            initialFarClipPlane = cam.farClipPlane;
+        }
+
+        return true;
+    }
+
+    float CalculateDistanceFromVisibleSpan(float latitudeDeg, float longitudeSpanDeg, float latitudeSpanDeg)
+    {
+        float safeLatitudeSpan = Mathf.Max(0.01f, latitudeSpanDeg);
+        float safeLongitudeSpan = Mathf.Max(0.01f, longitudeSpanDeg);
+        float verticalFovRad = cam.fieldOfView * Mathf.Deg2Rad;
+        float horizontalFovRad = 2f * Mathf.Atan(Mathf.Tan(verticalFovRad * 0.5f) * cam.aspect);
+        float tanHalfVertical = Mathf.Tan(verticalFovRad * 0.5f);
+        float tanHalfHorizontal = Mathf.Tan(horizontalFovRad * 0.5f);
+        if (tanHalfVertical < 1e-4f || tanHalfHorizontal < 1e-4f)
+        {
+            return currentDistanceMeters;
+        }
+
+        float metersPerDegreeLat = (float)((2.0 * math.PI * maxEllipsoidRadius) / 360.0);
+        float metersPerDegreeLon = Mathf.Max(
+            1f,
+            Mathf.Cos(latitudeDeg * Mathf.Deg2Rad) * metersPerDegreeLat);
+
+        float halfVerticalMeters = safeLatitudeSpan * 0.5f * metersPerDegreeLat;
+        float halfHorizontalMeters = safeLongitudeSpan * 0.5f * metersPerDegreeLon;
+
+        float verticalDistance = halfVerticalMeters / tanHalfVertical;
+        float horizontalDistance = halfHorizontalMeters / tanHalfHorizontal;
+        return Mathf.Max(verticalDistance, horizontalDistance);
     }
 
     readonly struct EnuBasis

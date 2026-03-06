@@ -51,7 +51,7 @@ public class LocalTerrainServer : MonoBehaviour
     [SerializeField] private string secondaryArchiveName = "terrain";
     [SerializeField] private bool useDirectoryManifestIndex = true;
     [SerializeField] private string directoryManifestFileName = "manifest.tsv";
-    [SerializeField] private bool writeDirectoryManifestWhenMissing = false;
+    [SerializeField] private bool writeDirectoryManifestWhenMissing = true;
     [SerializeField, Min(0)] private int maxCachedTilesPerServer = 512;
     [SerializeField] private int maxMissingRequestLogs = 20;
     [SerializeField] private bool logMissingRequests = false;

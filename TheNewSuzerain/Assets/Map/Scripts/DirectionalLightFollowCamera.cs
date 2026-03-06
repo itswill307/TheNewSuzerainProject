@@ -4,14 +4,13 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class DirectionalLightFollowCamera : MonoBehaviour
 {
-    [Header("References")]
-    [SerializeField] MapControllerEqr mapController;
-    [SerializeField] Camera targetCamera;
-    [SerializeField] bool useMainCameraIfMissing = true;
+    [Header("Plane")]
+    [SerializeField] Transform planeTransform;
+    [SerializeField] Vector3 localPlaneNormal = Vector3.back;
+    [SerializeField] Vector3 localPlaneUp = Vector3.up;
+    [SerializeField] bool pointTowardPlane = true;
 
     [Header("Behavior")]
-    [SerializeField] bool useMapControllerBaseRotation = true;
-    [SerializeField] bool lookOppositeCameraForward = false;
     [SerializeField] Vector3 eulerOffset = Vector3.zero;
     [SerializeField] bool updateInEditMode = false;
 
@@ -21,29 +20,26 @@ public class DirectionalLightFollowCamera : MonoBehaviour
     void Reset()
     {
         attachedLight = GetComponent<Light>();
-        if (targetCamera == null)
-        {
-            targetCamera = Camera.main;
-        }
-        if (mapController == null && targetCamera != null)
-        {
-            mapController = targetCamera.GetComponent<MapControllerEqr>();
-        }
     }
 
     void OnEnable()
     {
         attachedLight = GetComponent<Light>();
-        TryAutoAssignCamera();
-        TryAutoAssignMapController();
         warnedNonDirectional = false;
     }
 
     void OnValidate()
     {
         attachedLight = GetComponent<Light>();
-        TryAutoAssignCamera();
-        TryAutoAssignMapController();
+        if (localPlaneNormal.sqrMagnitude < 1e-6f)
+        {
+            localPlaneNormal = Vector3.back;
+        }
+
+        if (localPlaneUp.sqrMagnitude < 1e-6f)
+        {
+            localPlaneUp = Vector3.up;
+        }
     }
 
     void LateUpdate()
@@ -54,33 +50,6 @@ public class DirectionalLightFollowCamera : MonoBehaviour
         }
 
         ApplyRotation();
-    }
-
-    void TryAutoAssignCamera()
-    {
-        if (targetCamera != null || !useMainCameraIfMissing)
-        {
-            return;
-        }
-
-        targetCamera = Camera.main;
-    }
-
-    void TryAutoAssignMapController()
-    {
-        if (mapController != null)
-        {
-            return;
-        }
-
-        if (targetCamera != null)
-        {
-            mapController = targetCamera.GetComponent<MapControllerEqr>();
-        }
-        else if (useMainCameraIfMissing && Camera.main != null)
-        {
-            mapController = Camera.main.GetComponent<MapControllerEqr>();
-        }
     }
 
     void ApplyRotation()
@@ -97,40 +66,29 @@ public class DirectionalLightFollowCamera : MonoBehaviour
             warnedNonDirectional = true;
         }
 
-        Quaternion rot = sourceRotation;
-        if (lookOppositeCameraForward)
-        {
-            rot = rot * Quaternion.Euler(0f, 180f, 0f);
-        }
-
-        transform.rotation = rot * Quaternion.Euler(eulerOffset);
+        transform.rotation = sourceRotation * Quaternion.Euler(eulerOffset);
     }
 
     bool TryGetSourceRotation(out Quaternion sourceRotation)
     {
-        sourceRotation = Quaternion.identity;
-
-        if (useMapControllerBaseRotation)
+        Vector3 planeNormal = localPlaneNormal.normalized;
+        Vector3 planeUp = localPlaneUp.normalized;
+        if (planeTransform != null)
         {
-            TryAutoAssignMapController();
-            if (mapController != null)
-            {
-                sourceRotation = mapController.GetBaseCameraLookRotation();
-                return true;
-            }
+            planeNormal = planeTransform.TransformDirection(planeNormal).normalized;
+            planeUp = planeTransform.TransformDirection(planeUp).normalized;
         }
 
-        Camera cam = targetCamera;
-        if (cam == null && useMainCameraIfMissing)
+        planeUp = Vector3.ProjectOnPlane(planeUp, planeNormal).normalized;
+        if (planeUp.sqrMagnitude < 1e-6f)
         {
-            cam = Camera.main;
-        }
-        if (cam == null)
-        {
-            return false;
+            planeUp = Mathf.Abs(Vector3.Dot(planeNormal, Vector3.up)) < 0.99f
+                ? Vector3.ProjectOnPlane(Vector3.up, planeNormal).normalized
+                : Vector3.ProjectOnPlane(Vector3.right, planeNormal).normalized;
         }
 
-        sourceRotation = cam.transform.rotation;
+        Vector3 forward = pointTowardPlane ? -planeNormal : planeNormal;
+        sourceRotation = Quaternion.LookRotation(forward, planeUp);
         return true;
     }
 }

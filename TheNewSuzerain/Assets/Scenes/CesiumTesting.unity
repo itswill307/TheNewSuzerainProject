@@ -373,7 +373,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1239673844}
   serializedVersion: 2
-  m_LocalRotation: {x: -1.3877788e-17, y: 6.386666e-18, z: 1.6297085e-18, w: 1}
+  m_LocalRotation: {x: -1.3877788e-17, y: 6.3866685e-18, z: 1.6297064e-18, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1.0000004, z: 1}
   m_ConstrainProportionsScale: 0
@@ -431,7 +431,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1239673844}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3bef32f31a547984f88be1ab98b65f04, type: 3}
   m_Name: 
@@ -455,7 +455,7 @@ MonoBehaviour:
     c0:
       x: 0.9647534819407176
       y: -0.26315531361395944
-      z: -7.738988031082643e-18
+      z: -7.739000952047469e-18
       w: 0
     c1:
       x: -0.20236462269578312
@@ -551,12 +551,12 @@ MonoBehaviour:
   focusHeightMeters: 0
   minLatitudeDeg: -85
   maxLatitudeDeg: 85
-  zoomSpeed: 0.002
+  zoomSpeed: 0.012
   dynamicZoomSpeed: 1
   minDynamicZoomAltitudeMeters: 200
   maxDynamicZoomAltitudeMeters: 3000000
-  minZoomSpeedScale: 0.5
-  maxZoomSpeedScale: 1.6
+  minZoomSpeedScale: 1
+  maxZoomSpeedScale: 3
   minZoomDistanceMeters: 100
   zoomInBufferMeters: 25
   initialZoomDistanceMeters: 0
@@ -569,7 +569,7 @@ MonoBehaviour:
   maxNearToFarRatio: 100000
   panKeySpeed: 800
   panDragSpeed: 1
-  rotateSensitivity: 0.25
+  rotateSensitivity: 0.14
   minPitchDeg: -85
   maxPitchDeg: 85
   minYawDeg: -85

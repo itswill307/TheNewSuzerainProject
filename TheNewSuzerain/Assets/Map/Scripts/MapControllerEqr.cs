@@ -25,7 +25,11 @@ public class MapControllerEqr : MonoBehaviour
     float nearBufferExtraUnits = 0f;
 
     [Header("Zoom")]
-    [SerializeField] float zoomSpeed = 15f;
+    [SerializeField, Tooltip("Base exponential scroll sensitivity.")]
+    float zoomSpeed = 0.012f;
+    [SerializeField] bool dynamicZoomSpeed = true;
+    [SerializeField] float minZoomSpeedScale = 1f;
+    [SerializeField] float maxZoomSpeedScale = 3f;
     [SerializeField] float zoomInBuffer = 0.001f;
 
     [Header("Camera Clipping")]
@@ -86,6 +90,9 @@ public class MapControllerEqr : MonoBehaviour
     float cachedMinLatLimit = -90f;
     float cachedMaxLatLimit = 90f;
     float lastZoomForLimits = -1f;
+    int lastScreenWidth;
+    int lastScreenHeight;
+    float lastFieldOfView;
 
     void Awake()
     {
@@ -110,6 +117,7 @@ public class MapControllerEqr : MonoBehaviour
         PositionCamera();
         SyncMaterialConstants();
         SetupFlatMap();
+        CacheCameraShape();
     }
 
     void OnEnable()
@@ -356,42 +364,15 @@ public class MapControllerEqr : MonoBehaviour
     {
         if (!Application.isPlaying) return;
 
-        float scroll = input.Map.Zoom.ReadValue<float>();
-        float zoomT = Mathf.InverseLerp(minZoom, maxZoom, currentZoom);
-        float speedScale = Mathf.Lerp(0.2f, 1f, Mathf.Pow(Mathf.Clamp01(zoomT), 1f / 3f));
-        currentZoom = Mathf.Clamp(currentZoom - scroll * zoomSpeed * speedScale, minZoom, maxZoom);
-        SyncCameraFarClip();
-
-        if (mapMat != null)
+        if (CameraShapeChanged())
         {
-            SyncMaterialConstants();
-
-            if (autoSphereFromZoom)
-            {
-                float switchZoom = GetSphereSwitchZoom();
-                sphereMode = currentZoom <= switchZoom;
-            }
-
-            if (enableZoomMorph)
-            {
-                float zoomRange = maxZoom - minZoom;
-                if (zoomRange > 0f)
-                {
-                    float normalizedZoom = (maxZoom - currentZoom) / zoomRange;
-                    float linear = Mathf.Clamp01(normalizedZoom);
-                    float cubic = linear * linear * linear;
-                    float t = useCubicMorph ? cubic : Mathf.Clamp01(linear);
-                    currentMorph = Mathf.Lerp(0.5f, 1f, t);
-                }
-            }
-            else
-            {
-                currentMorph = 0.5f;
-            }
-
-            mapMat.SetFloat("_Morph", currentMorph);
-            mapMat.SetFloat("_Sphere", sphereMode ? 1f : 0f);
+            CalculateZoomLimits();
+            currentZoom = Mathf.Clamp(currentZoom, minZoom, maxZoom);
+            CacheCameraShape();
         }
+
+        UpdateZoom();
+        RefreshProjectionState();
 
         Vector2 moveKeys = input.Map.Move.ReadValue<Vector2>();
         Vector2 dragPan = input.Map.DragPan.ReadValue<Vector2>();
@@ -530,6 +511,9 @@ public class MapControllerEqr : MonoBehaviour
 
         nearBufferElevationMultiplier = Mathf.Max(0f, nearBufferElevationMultiplier);
         nearBufferExtraUnits = Mathf.Max(0f, nearBufferExtraUnits);
+        zoomSpeed = Mathf.Max(0.0001f, zoomSpeed);
+        minZoomSpeedScale = Mathf.Max(0.01f, minZoomSpeedScale);
+        maxZoomSpeedScale = Mathf.Max(minZoomSpeedScale, maxZoomSpeedScale);
 
         UpdateDerivedRadius();
         UpdateMapDimensions();
@@ -548,41 +532,59 @@ public class MapControllerEqr : MonoBehaviour
         {
             currentZoom = Mathf.Clamp(currentZoom, minZoom, maxZoom);
         }
-        SyncCameraFarClip();
-
-        if (enableZoomMorph && maxZoom > minZoom)
-        {
-            float zoomRange = maxZoom - minZoom;
-            float normalizedZoom = (maxZoom - currentZoom) / zoomRange;
-            float linear = Mathf.Clamp01(normalizedZoom);
-            float cubic = linear * linear * linear;
-            float t = useCubicMorph ? cubic : Mathf.Clamp01(linear);
-            currentMorph = Mathf.Lerp(0.5f, 1f, t);
-        }
-        else
-        {
-            currentMorph = 0.5f;
-        }
-
-        if (mapMat != null)
-        {
-            SyncMaterialConstants();
-
-            if (autoSphereFromZoom)
-            {
-                float switchZoom = GetSphereSwitchZoom();
-                sphereMode = currentZoom <= switchZoom;
-            }
-
-            mapMat.SetFloat("_Morph", currentMorph);
-            mapMat.SetFloat("_Sphere", sphereMode ? 1f : 0f);
-        }
+        RefreshProjectionState();
 
         if (cam != null)
         {
             PositionCamera();
             UpdateUVOffset();
+            CacheCameraShape();
         }
+    }
+
+    void UpdateZoom()
+    {
+        float scroll = input.Map.Zoom.ReadValue<float>();
+        if (Mathf.Abs(scroll) < 0.001f)
+        {
+            return;
+        }
+
+        float zoomFactor = Mathf.Exp(-scroll * GetZoomExponent());
+        currentZoom = Mathf.Clamp(currentZoom * zoomFactor, minZoom, maxZoom);
+    }
+
+    float GetZoomExponent()
+    {
+        float exponent = zoomSpeed;
+        if (!dynamicZoomSpeed)
+        {
+            return exponent;
+        }
+
+        float safeMinZoom = Mathf.Max(0.01f, minZoom);
+        float safeMaxZoom = Mathf.Max(safeMinZoom + 0.01f, maxZoom);
+        float referenceZoom = Mathf.Max(safeMinZoom, currentZoom);
+        float logMin = Mathf.Log10(safeMinZoom);
+        float logMax = Mathf.Log10(safeMaxZoom);
+        float logReference = Mathf.Log10(referenceZoom);
+        float t = Mathf.InverseLerp(logMin, logMax, logReference);
+
+        return exponent * Mathf.Lerp(minZoomSpeedScale, maxZoomSpeedScale, t);
+    }
+
+    bool CameraShapeChanged()
+    {
+        return lastScreenWidth != Screen.width ||
+               lastScreenHeight != Screen.height ||
+               !Mathf.Approximately(lastFieldOfView, cam.fieldOfView);
+    }
+
+    void CacheCameraShape()
+    {
+        lastScreenWidth = Screen.width;
+        lastScreenHeight = Screen.height;
+        lastFieldOfView = cam.fieldOfView;
     }
 
     // Public read-only state for systems that need to stay in sync with map projection/camera state.
@@ -593,9 +595,13 @@ public class MapControllerEqr : MonoBehaviour
     public float HeightMaxKm => heightMaxKm;
     public float HeightExaggeration => heightExaggeration;
     public float CurrentMorph => currentMorph;
+    public float CurrentZoom => currentZoom;
     public bool SphereMode => sphereMode;
     public float FocusLongitudeDeg => GetFocusLongitudeDeg();
     public float CameraLatitudeDeg => cameraLat;
+    public float OrbitYawDeg => orbitYawDeg;
+    public float OrbitPitchDeg => orbitPitchDeg;
+    public Camera ControlledCamera => cam != null ? cam : GetComponent<Camera>();
     public Vector2 CurrentUvOffset => new Vector2(focusLon / 360f, 0f);
     public Quaternion GetBaseCameraLookRotation()
     {
@@ -622,6 +628,185 @@ public class MapControllerEqr : MonoBehaviour
         longitudeDeg = (uv.x - 0.5f) * 360f;
         latitudeDeg = (uv.y - 0.5f) * 180f;
         return true;
+    }
+
+    public MapCesiumTransitionViewState CaptureTransitionViewState()
+    {
+        if (cam == null)
+        {
+            cam = GetComponent<Camera>();
+        }
+
+        GetFallbackPanDegreesPerPixel(out float degreesPerPixelX, out float degreesPerPixelY);
+        TryGetPanDegreesPerPixelAtScreen(
+            new Vector2(Screen.width * 0.5f, Screen.height * 0.5f),
+            out degreesPerPixelX,
+            out degreesPerPixelY);
+
+        return new MapCesiumTransitionViewState
+        {
+            isValid = cam != null,
+            focusLongitudeDeg = GetFocusLongitudeDeg(),
+            focusLatitudeDeg = cameraLat,
+            focusHeightMeters = 0.0,
+            orbitYawDeg = orbitYawDeg,
+            orbitPitchDeg = orbitPitchDeg,
+            fieldOfViewDeg = cam != null ? cam.fieldOfView : 60f,
+            visibleLongitudeSpanDeg = Mathf.Abs(degreesPerPixelX) * Mathf.Max(1, Screen.width),
+            visibleLatitudeSpanDeg = Mathf.Abs(degreesPerPixelY) * Mathf.Max(1, Screen.height)
+        };
+    }
+
+    public void ApplyTransitionViewState(MapCesiumTransitionViewState state)
+    {
+        if (!state.isValid)
+        {
+            return;
+        }
+
+        if (cam == null)
+        {
+            cam = GetComponent<Camera>();
+        }
+
+        if (cam == null)
+        {
+            return;
+        }
+
+        cam.fieldOfView = Mathf.Clamp(state.fieldOfViewDeg, 1f, 179f);
+        CalculateZoomLimits();
+
+        focusLon = Mathf.Repeat((float)state.focusLongitudeDeg, 360f);
+        cameraLat = Mathf.Clamp((float)state.focusLatitudeDeg, -89.9f, 89.9f);
+        orbitYawDeg = Mathf.Clamp(state.orbitYawDeg, minYawDeg, maxYawDeg);
+        orbitPitchDeg = Mathf.Clamp(state.orbitPitchDeg, minPitchDeg, maxPitchDeg);
+
+        currentZoom = CalculateZoomFromVisibleSpans(
+            state.visibleLongitudeSpanDeg,
+            state.visibleLatitudeSpanDeg);
+        currentZoom = Mathf.Clamp(currentZoom, minZoom, maxZoom);
+
+        RefreshProjectionState();
+        (cachedMinLatLimit, cachedMaxLatLimit) = CalculateLatitudeLimitsFromFOV();
+        lastZoomForLimits = currentZoom;
+        cameraLat = Mathf.Clamp(cameraLat, cachedMinLatLimit, cachedMaxLatLimit);
+
+        PositionCamera();
+        UpdateUVOffset();
+    }
+
+    void RefreshProjectionState()
+    {
+        SyncCameraFarClip();
+
+        if (enableZoomMorph && maxZoom > minZoom)
+        {
+            float zoomRange = maxZoom - minZoom;
+            float normalizedZoom = (maxZoom - currentZoom) / zoomRange;
+            float linear = Mathf.Clamp01(normalizedZoom);
+            float cubic = linear * linear * linear;
+            float t = useCubicMorph ? cubic : linear;
+            currentMorph = Mathf.Lerp(0.5f, 1f, Mathf.Clamp01(t));
+        }
+        else
+        {
+            currentMorph = 0.5f;
+        }
+
+        if (autoSphereFromZoom)
+        {
+            float switchZoom = GetSphereSwitchZoom();
+            sphereMode = currentZoom <= switchZoom;
+        }
+
+        if (mapMat == null)
+        {
+            return;
+        }
+
+        SyncMaterialConstants();
+        mapMat.SetFloat("_Morph", currentMorph);
+        mapMat.SetFloat("_Sphere", sphereMode ? 1f : 0f);
+    }
+
+    void GetFallbackPanDegreesPerPixel(out float degreesPerPixelX, out float degreesPerPixelY)
+    {
+        float verticalFovRad = cam.fieldOfView * Mathf.Deg2Rad;
+        float horizontalFovRad = 2f * Mathf.Atan(Mathf.Tan(verticalFovRad * 0.5f) * cam.aspect);
+        float worldUnitsPerPixelX = (2f * currentZoom * Mathf.Tan(horizontalFovRad * 0.5f)) / Mathf.Max(1, Screen.width);
+        float worldUnitsPerPixelY = (2f * currentZoom * Mathf.Tan(verticalFovRad * 0.5f)) / Mathf.Max(1, Screen.height);
+
+        degreesPerPixelY = (worldUnitsPerPixelY / mapHeight) * 180f;
+        float cosLat = Mathf.Cos(cameraLat * Mathf.Deg2Rad);
+        float widthFactor = Mathf.Lerp(1f, cosLat, currentMorph * 0.5f);
+        widthFactor = Mathf.Max(0.01f, widthFactor);
+        degreesPerPixelX = (worldUnitsPerPixelX / (mapWidth * widthFactor)) * 360f;
+    }
+
+    void GetCurrentVisibleSpans(out float longitudeSpanDeg, out float latitudeSpanDeg)
+    {
+        GetFallbackPanDegreesPerPixel(out float degreesPerPixelX, out float degreesPerPixelY);
+        TryGetPanDegreesPerPixelAtScreen(
+            new Vector2(Screen.width * 0.5f, Screen.height * 0.5f),
+            out degreesPerPixelX,
+            out degreesPerPixelY);
+
+        longitudeSpanDeg = Mathf.Abs(degreesPerPixelX) * Mathf.Max(1, Screen.width);
+        latitudeSpanDeg = Mathf.Abs(degreesPerPixelY) * Mathf.Max(1, Screen.height);
+    }
+
+    float CalculateZoomFromVisibleSpans(float longitudeSpanDeg, float latitudeSpanDeg)
+    {
+        float targetLongitudeSpan = Mathf.Max(0.01f, longitudeSpanDeg);
+        float targetLatitudeSpan = Mathf.Max(0.01f, latitudeSpanDeg);
+
+        float originalZoom = currentZoom;
+        float bestZoom = Mathf.Clamp(originalZoom, minZoom, maxZoom);
+        float low = minZoom;
+        float high = maxZoom;
+
+        currentZoom = high;
+        RefreshProjectionState();
+        PositionCamera();
+        UpdateUVOffset();
+        GetCurrentVisibleSpans(out float maxLongitudeSpan, out float maxLatitudeSpan);
+        if (maxLongitudeSpan < targetLongitudeSpan || maxLatitudeSpan < targetLatitudeSpan)
+        {
+            currentZoom = bestZoom;
+            RefreshProjectionState();
+            PositionCamera();
+            UpdateUVOffset();
+            return high;
+        }
+
+        for (int i = 0; i < 20; i++)
+        {
+            float mid = 0.5f * (low + high);
+            currentZoom = mid;
+            RefreshProjectionState();
+            PositionCamera();
+            UpdateUVOffset();
+            GetCurrentVisibleSpans(out float measuredLongitudeSpan, out float measuredLatitudeSpan);
+
+            bool fitsTarget = measuredLongitudeSpan >= targetLongitudeSpan &&
+                              measuredLatitudeSpan >= targetLatitudeSpan;
+            if (fitsTarget)
+            {
+                bestZoom = mid;
+                high = mid;
+            }
+            else
+            {
+                low = mid;
+            }
+        }
+
+        currentZoom = bestZoom;
+        RefreshProjectionState();
+        PositionCamera();
+        UpdateUVOffset();
+        return bestZoom;
     }
 
     void TryBeginPanAnchor(Vector2 screenPos)

@@ -1,4 +1,4 @@
-Shader "Map/CesiumLandcoverOverlayLUT"
+Shader "CesiumLandcoverOverlayLUT"
 {
     Properties
     {

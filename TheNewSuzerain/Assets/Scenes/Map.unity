@@ -133,8 +133,8 @@ GameObject:
   - component: {fileID: 101723293}
   - component: {fileID: 101723297}
   m_Layer: 0
-  m_Name: MainCamera
-  m_TagString: Untagged
+  m_Name: FlatmapCamera
+  m_TagString: MainCamera
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -148,7 +148,7 @@ Transform:
   m_GameObject: {fileID: 101723291}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -14069.753}
+  m_LocalPosition: {x: 0, y: 0, z: -14076.853}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -238,7 +238,7 @@ Camera:
     width: 1
     height: 1
   near clip plane: 0.3
-  far clip plane: 36379.277
+  far clip plane: 36386.38
   field of view: 60
   orthographic: 0
   orthographic size: 5
@@ -268,7 +268,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 579d793078b65f541a2e57ec73cfd491, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::WorldMapController_Sinusoidal
+  m_EditorClassIdentifier: Assembly-CSharp::MapControllerEqr
   mapMat: {fileID: 2100000, guid: 06539798bb9eaa64aa5c164b4d2bdde9, type: 2}
   mapRenderer: {fileID: 1554884630}
   earthRadiusKm: 6371.009
@@ -279,8 +279,11 @@ MonoBehaviour:
   enableGlobalElevation: 0
   nearBufferElevationMultiplier: 1
   nearBufferExtraUnits: 0
-  zoomSpeed: 1000
-  zoomInBuffer: 1e-10
+  zoomSpeed: 0.012
+  dynamicZoomSpeed: 1
+  minZoomSpeedScale: 1
+  maxZoomSpeedScale: 3
+  zoomInBuffer: 0.001
   autoFarClip: 1
   farClipPaddingRadius: 3.5
   minFarClip: 20000
@@ -297,8 +300,8 @@ MonoBehaviour:
   enableZoomMorph: 1
   useCubicMorph: 1
   sphereMode: 0
-  autoSphereFromZoom: 1
---- !u!1 &374130106
+  autoSphereFromZoom: 0
+--- !u!1 &262332785
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -306,128 +309,327 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 374130109}
-  - component: {fileID: 374130108}
-  - component: {fileID: 374130107}
-  - component: {fileID: 374130110}
+  - component: {fileID: 262332786}
+  - component: {fileID: 262332788}
+  - component: {fileID: 262332787}
   m_Layer: 0
-  m_Name: LocalElevation
+  m_Name: MapData
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!23 &374130107
-MeshRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 374130106}
-  m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_ForceMeshLod: -1
-  m_MeshLodSelectionBias: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 2100000, guid: 585bd8f8960976642864b0823e114108, type: 2}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 0
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_MaskInteraction: 0
-  m_AdditionalVertexStreams: {fileID: 0}
---- !u!33 &374130108
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 374130106}
-  m_Mesh: {fileID: 4300000, guid: 3bc40fcb43a9cfe428ebd0fb9f07aaab, type: 2}
---- !u!4 &374130109
+--- !u!4 &262332786
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 374130106}
+  m_GameObject: {fileID: 262332785}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1554884629}
+  m_Father: {fileID: 2010412340}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &374130110
+--- !u!114 &262332787
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 374130106}
+  m_GameObject: {fileID: 262332785}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3fd0a844f1a8f444c8134bcc48e5e19a, type: 3}
+  m_Script: {fileID: 11500000, guid: abef3aa088212664a8603e56a2fb617d, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LocalPatchController
-  mapController: {fileID: 101723297}
-  localPatchRenderer: {fileID: 374130107}
-  localPatchMaterial: {fileID: 2100000, guid: 585bd8f8960976642864b0823e114108, type: 2}
-  etopoManifestCsv: {fileID: 4900000, guid: 25ab7d42497782845be1f3893849ca26, type: 3}
-  sphereModeOnly: 1
-  maskGlobalUnderPatch: 1
-  trackScreenAnchor: 1
-  viewportAnchor01: {x: 0.5, y: 0.5}
-  recenterThresholdDeg: 1
-  autoSpanFromMesh: 1
-  manualSpanLonDeg: 8
-  manualSpanLatDeg: 5
-  spanScale: 1
-  composeHeightFromTiles: 1
-  outputWidth: 1024
-  outputHeight: 512
-  bilinearTileSampling: 1
-  missingSampleFallback01: 0.5
-  releaseComposedTextureWhenInactive: 0
-  minSecondsBetweenComposes: 0.15
-  useAddressables: 1
-  allowEditorAssetDatabaseFallback: 1
-  maxCachedTiles: 24
-  releaseUnusedTilesImmediately: 0
-  releaseTileCacheWhenInactive: 0
-  disableLocalHeightMeshForTesting: 1
-  verboseLogs: 0
+  m_EditorClassIdentifier: CesiumForUnity::CesiumForUnity.CesiumTileMapServiceRasterOverlay
+  _materialKey: 0
+  _showCreditsOnScreen: 0
+  _maximumScreenSpaceError: 2
+  _maximumTextureSize: 2048
+  _maximumSimultaneousTileLoads: 20
+  _subTileCacheBytes: 16777216
+  _url: http://localhost:8081
+  _specifyZoomLevels: 0
+  _minimumLevel: 0
+  _maximumLevel: 10
+--- !u!114 &262332788
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 262332785}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 844ac86b07dcfa3468f56da55d787510, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CesiumForUnity::CesiumForUnity.Cesium3DTileset
+  _showCreditsOnScreen: 0
+  _tilesetSource: 1
+  _url: http://localhost:8080/layer.json
+  _ionAssetID: 0
+  _ionAccessToken: 
+  _ionServer: {fileID: 11400000, guid: 80a7c8d559796aa46bbe8de49aa3b485, type: 2}
+  _maximumScreenSpaceError: 16
+  _preloadAncestors: 1
+  _preloadSiblings: 1
+  _forbidHoles: 0
+  _maximumSimultaneousTileLoads: 20
+  _maximumCachedBytes: 536870912
+  _loadingDescendantLimit: 20
+  _enableFrustumCulling: 1
+  _enableFogCulling: 1
+  _enforceCulledScreenSpaceError: 1
+  _culledScreenSpaceError: 64
+  _opaqueMaterial: {fileID: 2100000, guid: bf4761986870100449745975d92b6257, type: 2}
+  _generateSmoothNormals: 0
+  _ignoreKhrMaterialsUnlit: 0
+  _pointCloudShading:
+    _attenuation: 0
+    _geometricErrorScale: 1
+    _maximumAttenuation: 0
+    _baseResolution: 0
+  _suspendUpdate: 0
+  _showTilesInHierarchy: 0
+  _updateInEditor: 1
+  _logSelectionStats: 0
+  _createPhysicsMeshes: 0
+--- !u!1 &559662400
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 559662401}
+  - component: {fileID: 559662406}
+  - component: {fileID: 559662405}
+  - component: {fileID: 559662404}
+  - component: {fileID: 559662403}
+  - component: {fileID: 559662402}
+  - component: {fileID: 559662407}
+  m_Layer: 0
+  m_Name: GlobeCamera
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &559662401
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 559662400}
+  serializedVersion: 2
+  m_LocalRotation: {x: 1.3877788e-17, y: 5.729802e-17, z: -4.537507e-17, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2010412340}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &559662402
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 559662400}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40f0829ad76b546b0aa3ba01bd375b28, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CesiumMapController
+  georeference: {fileID: 2010412339}
+  initializeFromCurrentView: 0
+  focusLongitudeDeg: 0
+  focusLatitudeDeg: 0
+  focusHeightMeters: 0
+  minLatitudeDeg: -85
+  maxLatitudeDeg: 85
+  zoomSpeed: 0.012
+  dynamicZoomSpeed: 1
+  minDynamicZoomAltitudeMeters: 200
+  maxDynamicZoomAltitudeMeters: 3000000
+  minZoomSpeedScale: 1
+  maxZoomSpeedScale: 3
+  minZoomDistanceMeters: 100
+  zoomInBufferMeters: 25
+  initialZoomDistanceMeters: 0
+  autoFarClip: 1
+  autoNearClip: 1
+  farClipPaddingMeters: 50000
+  minFarClip: 200000
+  maxFarClip: 50000000
+  maxNearClip: 1000
+  maxNearToFarRatio: 100000
+  panKeySpeed: 800
+  panDragSpeed: 1
+  rotateSensitivity: 0.25
+  minPitchDeg: -85
+  maxPitchDeg: 85
+  minYawDeg: -85
+  maxYawDeg: 85
+  returnToDefaultSpeed: 320
+--- !u!114 &559662403
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 559662400}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 74f14e1eb550b9a4fb6c0a2f0456845b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CesiumForUnity::CesiumForUnity.CesiumGlobeAnchor
+  _adjustOrientationForGlobeWhenMoving: 1
+  _detectTransformChanges: 1
+  _localToGlobeFixedMatrix:
+    c0:
+      x: 0.9647534819407176
+      y: -0.26315531361395944
+      z: -0.0000000000000001281862785343573
+      w: 0
+    c1:
+      x: -0.2023645503245802
+      y: -0.741888513919219
+      z: 0.6392573986170699
+      w: 0
+    c2:
+      x: 0.16822398121311902
+      y: 0.6167258011721835
+      z: 0.7689928337204038
+      w: 0
+    c3:
+      x: -1292934.4950404565
+      y: -4740026.104285267
+      z: 4056960.1513377777
+      w: 1
+  _localToGlobeFixedMatrixIsValid: 1
+--- !u!114 &559662404
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 559662400}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalCameraData
+  m_RenderShadows: 1
+  m_RequiresDepthTextureOption: 2
+  m_RequiresOpaqueTextureOption: 2
+  m_CameraType: 0
+  m_Cameras: []
+  m_RendererIndex: -1
+  m_VolumeLayerMask:
+    serializedVersion: 2
+    m_Bits: 1
+  m_VolumeTrigger: {fileID: 0}
+  m_VolumeFrameworkUpdateModeOption: 2
+  m_RenderPostProcessing: 0
+  m_Antialiasing: 0
+  m_AntialiasingQuality: 2
+  m_StopNaN: 0
+  m_Dithering: 0
+  m_ClearDepth: 1
+  m_AllowXRRendering: 1
+  m_AllowHDROutput: 1
+  m_UseScreenCoordOverride: 0
+  m_ScreenSizeOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_ScreenCoordScaleBias: {x: 0, y: 0, z: 0, w: 0}
+  m_RequiresDepthTexture: 0
+  m_RequiresColorTexture: 0
+  m_TaaSettings:
+    m_Quality: 3
+    m_FrameInfluence: 0.1
+    m_JitterScale: 1
+    m_MipBias: 0
+    m_VarianceClampScale: 0.9
+    m_ContrastAdaptiveSharpening: 0
+  m_Version: 2
+--- !u!81 &559662405
+AudioListener:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 559662400}
+  m_Enabled: 1
+--- !u!20 &559662406
+Camera:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 559662400}
+  m_Enabled: 1
+  serializedVersion: 2
+  m_ClearFlags: 1
+  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
+  m_projectionMatrixMode: 1
+  m_GateFitMode: 2
+  m_FOVAxisMode: 0
+  m_Iso: 200
+  m_ShutterSpeed: 0.005
+  m_Aperture: 16
+  m_FocusDistance: 10
+  m_FocalLength: 50
+  m_BladeCount: 5
+  m_Curvature: {x: 2, y: 11}
+  m_BarrelClipping: 0.25
+  m_Anamorphism: 0
+  m_SensorSize: {x: 36, y: 24}
+  m_LensShift: {x: 0, y: 0}
+  m_NormalizedViewPortRect:
+    serializedVersion: 2
+    x: 0
+    y: 0
+    width: 1
+    height: 1
+  near clip plane: 0.3
+  far clip plane: 1000
+  field of view: 60
+  orthographic: 0
+  orthographic size: 5
+  m_Depth: 0
+  m_CullingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_RenderingPath: -1
+  m_TargetTexture: {fileID: 0}
+  m_TargetDisplay: 0
+  m_TargetEye: 3
+  m_HDR: 1
+  m_AllowMSAA: 1
+  m_AllowDynamicResolution: 0
+  m_ForceIntoRT: 0
+  m_OcclusionCulling: 1
+  m_StereoConvergence: 10
+  m_StereoSeparation: 0.022
+--- !u!114 &559662407
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 559662400}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3bef32f31a547984f88be1ab98b65f04, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CesiumForUnity::CesiumForUnity.CesiumOriginShift
+  _distance: 0
 --- !u!1 &722242146
 GameObject:
   m_ObjectHideFlags: 0
@@ -568,13 +770,74 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1923a6cd6fb50764f9b31a2686ef3aec, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DirectionalLightFollowCamera
-  mapController: {fileID: 101723297}
-  targetCamera: {fileID: 101723295}
-  useMainCameraIfMissing: 1
-  useMapControllerBaseRotation: 1
-  lookOppositeCameraForward: 0
+  planeTransform: {fileID: 0}
+  localPlaneNormal: {x: 0, y: 0, z: -1}
+  localPlaneUp: {x: 0, y: 1, z: 0}
+  pointTowardPlane: 1
   eulerOffset: {x: 0, y: 0, z: 0}
   updateInEditMode: 0
+--- !u!1 &1382214565
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1382214567}
+  - component: {fileID: 1382214566}
+  m_Layer: 0
+  m_Name: TransitionManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1382214566
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1382214565}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc34d999fbc744e1a91e34da2731c65, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MapCesiumTransitionManager
+  mapController: {fileID: 101723297}
+  cesiumController: {fileID: 559662402}
+  mapCamera: {fileID: 101723295}
+  cesiumCamera: {fileID: 559662406}
+  mapModeBehaviours: []
+  cesiumModeBehaviours: []
+  mapModeObjects:
+  - {fileID: 1554884627}
+  cesiumModeObjects:
+  - {fileID: 2010412337}
+  switchToCesiumLatitudeSpanDeg: 20
+  switchToMapLatitudeSpanDeg: 21
+  minSecondsBetweenSwitches: 0.4
+  keepCesiumWarmInBackground: 1
+  cesiumWarmupSeconds: 0.2
+  hiddenCesiumRenderTextureSize: 256
+  startingMode: 0
+  manageMainCameraTag: 1
+--- !u!4 &1382214567
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1382214565}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1554884627
 GameObject:
   m_ObjectHideFlags: 0
@@ -588,7 +851,7 @@ GameObject:
   - component: {fileID: 1554884630}
   - component: {fileID: 1554884632}
   m_Layer: 0
-  m_Name: WorldMap
+  m_Name: Flatmap
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -616,7 +879,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 101723292}
-  - {fileID: 374130109}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!23 &1554884630
@@ -683,10 +945,8 @@ MonoBehaviour:
   cam: {fileID: 101723295}
   mapMaterial: {fileID: 2100000, guid: 06539798bb9eaa64aa5c164b4d2bdde9, type: 2}
   provinceIdTex: {fileID: 2800000, guid: bb93bd5c545c348dc9ea5b733f96a3a7, type: 3}
-  additionalMapRenderers:
-  - {fileID: 374130107}
-  additionalMapMaterials:
-  - {fileID: 2100000, guid: 585bd8f8960976642864b0823e114108, type: 2}
+  additionalMapRenderers: []
+  additionalMapMaterials: []
   highlightHovered: 1
   selectedIdProp: _SelectedID
   highlightColorProp: _HighlightColor
@@ -696,9 +956,140 @@ MonoBehaviour:
   hoverColor: {r: 0, g: 1, b: 1, a: 0.5}
   blockOcean: 1
   oceanId: 0
+--- !u!1 &1872131671
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1872131673}
+  - component: {fileID: 1872131672}
+  m_Layer: 0
+  m_Name: MapDataServer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1872131672
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1872131671}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cee7cf4659a69394da313ee371d04ef8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalTerrainServer
+  port: 8080
+  archiveName: heightmap
+  loadSecondaryArchive: 1
+  secondaryPort: 8081
+  secondaryArchiveName: terrain
+  useDirectoryManifestIndex: 1
+  directoryManifestFileName: manifest.tsv
+  writeDirectoryManifestWhenMissing: 1
+  maxCachedTilesPerServer: 512
+  maxMissingRequestLogs: 20
+  logMissingRequests: 0
+--- !u!4 &1872131673
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1872131671}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2010412337
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2010412340}
+  - component: {fileID: 2010412339}
+  - component: {fileID: 2010412338}
+  m_Layer: 0
+  m_Name: CesiumGlobe
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2010412338
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2010412337}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: be1fb41cdd01d7649a082f1a8f2bd114, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CesiumForUnity::CesiumForUnity.CesiumCameraManager
+  _useMainCamera: 0
+  _useSceneViewCameraInEditor: 1
+  _additionalCameras:
+  - {fileID: 559662406}
+--- !u!114 &2010412339
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2010412337}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d1305e05d46db92498ce698a4c366a5a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CesiumForUnity::CesiumForUnity.CesiumGeoreference
+  _ellipsoidOverride: {fileID: 0}
+  _originPlacement: 1
+  _originAuthority: 0
+  _latitude: 39.736401
+  _longitude: -105.25737
+  _height: 2250
+  _ecefX: -1292934.4950404565
+  _ecefY: -4740026.104285267
+  _ecefZ: 4056960.1513377777
+  _scale: 1
+--- !u!4 &2010412340
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2010412337}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 262332786}
+  - {fileID: 559662401}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 1554884629}
+  - {fileID: 2010412340}
+  - {fileID: 1872131673}
+  - {fileID: 1382214567}
   - {fileID: 722242149}
