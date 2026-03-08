@@ -13,12 +13,12 @@ using UnityEngine.InputSystem;
 /// _CesiumWorldDirToEcef) that the shader needs to derive geographic UV
 /// from world position for sampling the province ID texture.
 /// </summary>
-public class ProvincePickerCesium : MonoBehaviour
+public class CesiumProvincePicker : MonoBehaviour
 {
     [Header("Refs")]
     [SerializeField] CesiumGeoreference georeference;
     [SerializeField] Camera cesiumCamera;
-    [SerializeField] MapCesiumTransitionManager transitionManager;
+    [SerializeField] MapTransitionManager transitionManager;
     public Texture2D provinceIdTex;
 
     [Header("Highlight")]
@@ -62,24 +62,24 @@ public class ProvincePickerCesium : MonoBehaviour
 
         if (cesiumCamera == null)
         {
-            var controller = GetComponentInParent<CesiumMapController>();
+            var controller = GetComponentInParent<CesiumCameraController>();
             if (controller != null)
                 cesiumCamera = controller.ControlledCamera;
         }
 
         if (transitionManager == null)
-            transitionManager = FindFirstObjectByType<MapCesiumTransitionManager>();
+            transitionManager = FindFirstObjectByType<MapTransitionManager>();
 
         if (!provinceIdTex)
         {
-            Debug.LogError("ProvincePickerCesium: Province ID texture must be assigned.");
+            Debug.LogError("CesiumProvincePicker: Province ID texture must be assigned.");
             enabled = false;
             return;
         }
 
         if (georeference == null)
         {
-            Debug.LogError("ProvincePickerCesium: CesiumGeoreference not found.");
+            Debug.LogError("CesiumProvincePicker: CesiumGeoreference not found.");
             enabled = false;
             return;
         }
@@ -127,7 +127,7 @@ public class ProvincePickerCesium : MonoBehaviour
         // Only pick/highlight when Cesium is the visible mode,
         // not during background warm-up.
         if (transitionManager != null &&
-            transitionManager.ActiveMode != MapCesiumTransitionManager.ViewMode.Cesium)
+            transitionManager.ActiveMode != MapTransitionManager.ViewMode.Cesium)
         {
             return;
         }
@@ -401,7 +401,7 @@ public class ProvincePickerCesium : MonoBehaviour
             if (!hasWarnedGpuFallback)
             {
                 Debug.LogWarning(
-                    $"ProvincePickerCesium: Province ID texture '{provinceIdTex.name}' is not readable; using slower GPU readback fallback.");
+                    $"CesiumProvincePicker: Province ID texture '{provinceIdTex.name}' is not readable; using slower GPU readback fallback.");
                 hasWarnedGpuFallback = true;
             }
         }

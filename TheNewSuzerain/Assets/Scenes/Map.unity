@@ -268,7 +268,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 579d793078b65f541a2e57ec73cfd491, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::MapControllerEqr
+  m_EditorClassIdentifier: Assembly-CSharp::FlatmapCameraController
   mapMat: {fileID: 2100000, guid: 06539798bb9eaa64aa5c164b4d2bdde9, type: 2}
   mapRenderer: {fileID: 1554884630}
   earthRadiusKm: 6371.009
@@ -410,8 +410,8 @@ GameObject:
   - component: {fileID: 559662406}
   - component: {fileID: 559662405}
   - component: {fileID: 559662404}
-  - component: {fileID: 559662403}
   - component: {fileID: 559662402}
+  - component: {fileID: 559662403}
   - component: {fileID: 559662407}
   m_Layer: 0
   m_Name: GlobeCamera
@@ -446,7 +446,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 40f0829ad76b546b0aa3ba01bd375b28, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CesiumMapController
+  m_EditorClassIdentifier: Assembly-CSharp::CesiumCameraController
   georeference: {fileID: 2010412339}
   initializeFromCurrentView: 0
   focusLongitudeDeg: 0
@@ -806,7 +806,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc34d999fbc744e1a91e34da2731c65, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::MapCesiumTransitionManager
+  m_EditorClassIdentifier: Assembly-CSharp::MapTransitionManager
   mapController: {fileID: 101723297}
   cesiumController: {fileID: 559662402}
   cesiumTileset: {fileID: 262332788}
@@ -956,6 +956,7 @@ MonoBehaviour:
   cam: {fileID: 101723295}
   mapMaterial: {fileID: 2100000, guid: 06539798bb9eaa64aa5c164b4d2bdde9, type: 2}
   provinceIdTex: {fileID: 2800000, guid: bb93bd5c545c348dc9ea5b733f96a3a7, type: 3}
+  primaryMapRenderer: {fileID: 1554884630}
   additionalMapRenderers: []
   additionalMapMaterials: []
   highlightHovered: 1
@@ -964,59 +965,6 @@ MonoBehaviour:
   highlightColor: {r: 1, g: 0.75, b: 0, a: 0.6}
   hoverIdProp: _HoverID
   hoverColorProp: _HoverColor
-  hoverColor: {r: 0, g: 1, b: 1, a: 0.5}
-  blockOcean: 1
-  oceanId: 0
---- !u!1 &1563665705
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1563665706}
-  - component: {fileID: 1563665708}
-  m_Layer: 0
-  m_Name: ProvincePicker
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1563665706
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1563665705}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 2010412340}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1563665708
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1563665705}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e78c51c36e877ed428652ef2ad5d5cbf, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ProvincePickerCesium
-  georeference: {fileID: 2010412339}
-  cesiumCamera: {fileID: 559662406}
-  transitionManager: {fileID: 1382214566}
-  provinceIdTex: {fileID: 2800000, guid: bb93bd5c545c348dc9ea5b733f96a3a7, type: 3}
-  highlightHovered: 1
-  highlightColor: {r: 1, g: 0.75, b: 0, a: 0.6}
   hoverColor: {r: 0, g: 1, b: 1, a: 0.5}
   blockOcean: 1
   oceanId: 0
@@ -1086,6 +1034,7 @@ GameObject:
   - component: {fileID: 2010412340}
   - component: {fileID: 2010412339}
   - component: {fileID: 2010412338}
+  - component: {fileID: 2010412341}
   m_Layer: 0
   m_Name: CesiumGlobe
   m_TagString: Untagged
@@ -1146,9 +1095,30 @@ Transform:
   m_Children:
   - {fileID: 262332786}
   - {fileID: 559662401}
-  - {fileID: 1563665706}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2010412341
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2010412337}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e78c51c36e877ed428652ef2ad5d5cbf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CesiumProvincePicker
+  georeference: {fileID: 2010412339}
+  cesiumCamera: {fileID: 559662406}
+  transitionManager: {fileID: 1382214566}
+  provinceIdTex: {fileID: 2800000, guid: bb93bd5c545c348dc9ea5b733f96a3a7, type: 3}
+  enableProvinceHoverSelect: 0
+  highlightHovered: 1
+  highlightColor: {r: 1, g: 0.75, b: 0, a: 0.6}
+  hoverColor: {r: 0, g: 1, b: 1, a: 0.5}
+  blockOcean: 1
+  oceanId: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

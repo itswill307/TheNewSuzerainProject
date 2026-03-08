@@ -1,7 +1,7 @@
 using System;
 
 [Serializable]
-public struct MapCesiumTransitionViewState
+public struct MapTransitionViewState
 {
     public bool isValid;
     public double focusLongitudeDeg;

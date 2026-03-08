@@ -6,7 +6,7 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(Camera))]
 [RequireComponent(typeof(CesiumGlobeAnchor))]
 [DisallowMultipleComponent]
-public class CesiumMapController : MonoBehaviour
+public class CesiumCameraController : MonoBehaviour
 {
     [Header("Cesium")]
     [SerializeField] CesiumGeoreference georeference;
@@ -87,7 +87,7 @@ public class CesiumMapController : MonoBehaviour
 
         if (georeference == null)
         {
-            Debug.LogError("CesiumMapController requires a parent CesiumGeoreference.");
+            Debug.LogError("CesiumCameraController requires a parent CesiumGeoreference.");
             enabled = false;
             return;
         }
@@ -632,7 +632,7 @@ public class CesiumMapController : MonoBehaviour
         return georeference.transform.TransformPoint(ToVector3(unityLocal));
     }
 
-    public MapCesiumTransitionViewState CaptureTransitionViewState()
+    public MapTransitionViewState CaptureTransitionViewState()
     {
         if (!EnsureInitialized())
         {
@@ -647,7 +647,7 @@ public class CesiumMapController : MonoBehaviour
 
         float fillDistanceMeters = (float)GetWholeGlobeFillDistance();
 
-        return new MapCesiumTransitionViewState
+        return new MapTransitionViewState
         {
             isValid = true,
             focusLongitudeDeg = focusLongitudeDeg,
@@ -663,7 +663,7 @@ public class CesiumMapController : MonoBehaviour
         };
     }
 
-    public void ApplyTransitionViewState(MapCesiumTransitionViewState state)
+    public void ApplyTransitionViewState(MapTransitionViewState state)
     {
         if (!state.isValid || !EnsureInitialized())
         {

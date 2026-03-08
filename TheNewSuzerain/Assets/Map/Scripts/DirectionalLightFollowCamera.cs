@@ -1,11 +1,12 @@
 using UnityEngine;
 
 [ExecuteAlways]
+[RequireComponent(typeof(Light))]
 [DisallowMultipleComponent]
 public class DirectionalLightFollowCamera : MonoBehaviour
 {
-    [SerializeField] MapCesiumTransitionManager transitionManager;
-    [SerializeField] CesiumMapController cesiumController;
+    [SerializeField] MapTransitionManager transitionManager;
+    [SerializeField] CesiumCameraController cesiumController;
 
     [Header("Plane")]
     [SerializeField] Transform planeTransform;
@@ -109,12 +110,12 @@ public class DirectionalLightFollowCamera : MonoBehaviour
     {
         if (transitionManager == null)
         {
-            transitionManager = FindFirstObjectByType<MapCesiumTransitionManager>(FindObjectsInactive.Include);
+            transitionManager = FindFirstObjectByType<MapTransitionManager>(FindObjectsInactive.Include);
         }
 
         if (cesiumController == null)
         {
-            cesiumController = FindFirstObjectByType<CesiumMapController>(FindObjectsInactive.Include);
+            cesiumController = FindFirstObjectByType<CesiumCameraController>(FindObjectsInactive.Include);
         }
     }
 
@@ -122,7 +123,7 @@ public class DirectionalLightFollowCamera : MonoBehaviour
     {
         if (transitionManager != null)
         {
-            return transitionManager.ActiveMode == MapCesiumTransitionManager.ViewMode.Cesium;
+            return transitionManager.ActiveMode == MapTransitionManager.ViewMode.Cesium;
         }
 
         return cesiumController != null && cesiumController.isActiveAndEnabled;

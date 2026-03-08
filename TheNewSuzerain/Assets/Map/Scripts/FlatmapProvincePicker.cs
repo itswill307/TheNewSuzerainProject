@@ -1,15 +1,13 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-[RequireComponent(typeof(Renderer))]
-public class ProvincePickerEqr : MonoBehaviour
+public class FlatmapProvincePicker : MonoBehaviour
 {
     [Header("Refs")]
     public Camera cam;                 // your WorldMapController camera
     public Material mapMaterial;       // same material you set _Morph/_UVOffset on
     public Texture2D provinceIdTex;    // point, no mips, Read/Write not required
-    [SerializeField] Renderer[] additionalMapRenderers; // e.g., local detail patch renderer(s)
-    [SerializeField] Material[] additionalMapMaterials;
+    [SerializeField] Renderer primaryMapRenderer;
 
     [Header("Highlight (optional)")]
     public bool highlightHovered = true;
@@ -24,9 +22,6 @@ public class ProvincePickerEqr : MonoBehaviour
     [SerializeField] bool blockOcean = true;
     [SerializeField] int oceanId = 0; // Treat this ID as unhoverable/unselectable (background/ocean)
 
-    Renderer rend;
-    readonly System.Collections.Generic.List<Renderer> targetRenderers = new System.Collections.Generic.List<Renderer>(8);
-    readonly System.Collections.Generic.List<Material> targetMaterials = new System.Collections.Generic.List<Material>(8);
     Texture2D cachedProvinceTexture;
     Color32[] provincePixels;
     int provinceWidth;
@@ -39,30 +34,40 @@ public class ProvincePickerEqr : MonoBehaviour
 
     void Awake()
     {
-        if (!cam) cam = Camera.main;
-        rend = GetComponent<Renderer>();
         input = new InputSystem_Actions();
+        ResolveReferences();
 
-        if (!provinceIdTex)
+        if (!ValidateConfiguration(logErrors: true))
         {
-            Debug.LogError("Province ID texture must be assigned.");
-            enabled = false; return;
+            enabled = false;
+            return;
         }
+
         RefreshProvinceSamplingMode();
 
-        // Ensure material has the Province ID texture bound
-        CollectTargetMaterials();
         ApplyProvinceIdTextureToAll();
         ApplySharedSelectionState();
     }
 
     void OnEnable()
     {
+        input ??= new InputSystem_Actions();
+        ResolveReferences();
+        if (!ValidateConfiguration(logErrors: true))
+        {
+            enabled = false;
+            return;
+        }
+
         input.Enable();
         RefreshProvinceSamplingMode();
-        CollectTargetMaterials();
         ApplyProvinceIdTextureToAll();
         ApplySharedSelectionState();
+    }
+
+    void OnValidate()
+    {
+        ResolveReferences();
     }
 
     void OnDisable()
@@ -79,7 +84,6 @@ public class ProvincePickerEqr : MonoBehaviour
     void Update()
     {
         if (!cam || !mapMaterial) return;
-        CollectTargetMaterials();
         ApplyProvinceIdTextureToAll();
         ApplySharedSelectionState();
 
@@ -144,69 +148,22 @@ public class ProvincePickerEqr : MonoBehaviour
         }
     }
 
-    void CollectTargetMaterials()
-    {
-        targetMaterials.Clear();
-        AddMaterialIfValid(mapMaterial);
-
-        if (additionalMapMaterials != null)
-        {
-            for (int i = 0; i < additionalMapMaterials.Length; i++)
-            {
-                AddMaterialIfValid(additionalMapMaterials[i]);
-            }
-        }
-
-        if (additionalMapRenderers != null)
-        {
-            for (int i = 0; i < additionalMapRenderers.Length; i++)
-            {
-                Renderer candidate = additionalMapRenderers[i];
-                if (!candidate) continue;
-                Material shared = candidate.sharedMaterial;
-                if (shared) AddMaterialIfValid(shared);
-            }
-        }
-    }
-
-    void AddMaterialIfValid(Material mat)
-    {
-        if (!mat) return;
-        if (!targetMaterials.Contains(mat))
-        {
-            targetMaterials.Add(mat);
-        }
-    }
-
     void ApplyProvinceIdTextureToAll()
     {
-        if (!provinceIdTex) return;
-        for (int i = 0; i < targetMaterials.Count; i++)
-        {
-            Material mat = targetMaterials[i];
-            if (!mat || !mat.HasProperty("_ProvinceIDTex")) continue;
-            mat.SetTexture("_ProvinceIDTex", provinceIdTex);
-        }
+        if (!provinceIdTex || !mapMaterial || !mapMaterial.HasProperty("_ProvinceIDTex")) return;
+        mapMaterial.SetTexture("_ProvinceIDTex", provinceIdTex);
     }
 
     void SetIntOnAll(string prop, int value)
     {
-        for (int i = 0; i < targetMaterials.Count; i++)
-        {
-            Material mat = targetMaterials[i];
-            if (!mat || !mat.HasProperty(prop)) continue;
-            mat.SetInt(prop, value);
-        }
+        if (!mapMaterial || !mapMaterial.HasProperty(prop)) return;
+        mapMaterial.SetInt(prop, value);
     }
 
     void SetColorOnAll(string prop, Color value)
     {
-        for (int i = 0; i < targetMaterials.Count; i++)
-        {
-            Material mat = targetMaterials[i];
-            if (!mat || !mat.HasProperty(prop)) continue;
-            mat.SetColor(prop, value);
-        }
+        if (!mapMaterial || !mapMaterial.HasProperty(prop)) return;
+        mapMaterial.SetColor(prop, value);
     }
 
     void ApplySharedSelectionState()
@@ -225,50 +182,65 @@ public class ProvincePickerEqr : MonoBehaviour
 
         Vector2 screenPos = input.Map.Point.ReadValue<Vector2>();
         Ray sRay = cam.ScreenPointToRay(new Vector3(screenPos.x, screenPos.y, 0f));
-        CollectTargetRenderers();
-
-        bool hasHit = false;
-        float closestDistance = float.PositiveInfinity;
-        Vector2 bestUV = default;
-
-        for (int i = 0; i < targetRenderers.Count; i++)
-        {
-            Renderer target = targetRenderers[i];
-            if (!target) continue;
-
-            if (!TryGetUVOnRenderer(target, sRay, sphereModeActive, radius, out Vector2 candidateUV, out float hitDistance))
-            {
-                continue;
-            }
-
-            if (hitDistance < closestDistance)
-            {
-                closestDistance = hitDistance;
-                bestUV = candidateUV;
-                hasHit = true;
-            }
-        }
-
-        if (!hasHit) return false;
-        uv = bestUV;
-        return true;
+        return TryGetUVOnRenderer(primaryMapRenderer, sRay, sphereModeActive, radius, out uv, out _);
     }
 
-    void CollectTargetRenderers()
+    void ResolveReferences()
     {
-        targetRenderers.Clear();
-        if (rend) targetRenderers.Add(rend);
-
-        if (additionalMapRenderers == null) return;
-        for (int i = 0; i < additionalMapRenderers.Length; i++)
+        if (!cam)
         {
-            Renderer candidate = additionalMapRenderers[i];
-            if (!candidate || candidate == rend) continue;
-            if (!targetRenderers.Contains(candidate))
-            {
-                targetRenderers.Add(candidate);
-            }
+            cam = Camera.main;
         }
+
+        if (!primaryMapRenderer)
+        {
+            primaryMapRenderer = GetComponent<Renderer>();
+        }
+    }
+
+    bool ValidateConfiguration(bool logErrors)
+    {
+        if (!cam)
+        {
+            if (logErrors)
+            {
+                Debug.LogError("FlatmapProvincePicker: Camera reference must be assigned, or a MainCamera must exist.", this);
+            }
+
+            return false;
+        }
+
+        if (!mapMaterial)
+        {
+            if (logErrors)
+            {
+                Debug.LogError("FlatmapProvincePicker: Map material must be assigned.", this);
+            }
+
+            return false;
+        }
+
+        if (!provinceIdTex)
+        {
+            if (logErrors)
+            {
+                Debug.LogError("FlatmapProvincePicker: Province ID texture must be assigned.", this);
+            }
+
+            return false;
+        }
+
+        if (!primaryMapRenderer)
+        {
+            if (logErrors)
+            {
+                Debug.LogError("FlatmapProvincePicker: Assign a primary map renderer.", this);
+            }
+
+            return false;
+        }
+
+        return true;
     }
 
     bool TryGetUVOnRenderer(Renderer target, Ray screenRay, bool sphereModeActive, float radius, out Vector2 uv, out float distanceWs)
@@ -578,7 +550,7 @@ public class ProvincePickerEqr : MonoBehaviour
             if (!hasWarnedGpuFallback)
             {
                 Debug.LogWarning(
-                    $"ProvincePickerEqr: Province ID texture '{provinceIdTex.name}' is not readable; using slower GPU readback fallback.");
+                    $"FlatmapProvincePicker: Province ID texture '{provinceIdTex.name}' is not readable; using slower GPU readback fallback.");
                 hasWarnedGpuFallback = true;
             }
         }

@@ -2,7 +2,7 @@ using CesiumForUnity;
 using UnityEngine;
 
 [DisallowMultipleComponent]
-public class MapCesiumTransitionManager : MonoBehaviour
+public class MapTransitionManager : MonoBehaviour
 {
     const double WorldLongitudeDegrees = 360.0;
     const double WorldLatitudeDegrees = 180.0;
@@ -14,8 +14,8 @@ public class MapCesiumTransitionManager : MonoBehaviour
     }
 
     [Header("References")]
-    [SerializeField] MapControllerEqr mapController;
-    [SerializeField] CesiumMapController cesiumController;
+    [SerializeField] FlatmapCameraController mapController;
+    [SerializeField] CesiumCameraController cesiumController;
     [SerializeField] Cesium3DTileset cesiumTileset;
     [SerializeField] CesiumTileMapServiceRasterOverlay cesiumRasterOverlay;
     [SerializeField] LocalTerrainServer localTerrainServer;
@@ -144,7 +144,7 @@ public class MapCesiumTransitionManager : MonoBehaviour
             return;
         }
 
-        MapCesiumTransitionViewState state = mapController.CaptureTransitionViewState();
+        MapTransitionViewState state = mapController.CaptureTransitionViewState();
         if (!state.isValid)
         {
             return;
@@ -162,7 +162,7 @@ public class MapCesiumTransitionManager : MonoBehaviour
             return;
         }
 
-        MapCesiumTransitionViewState state = cesiumController.CaptureTransitionViewState();
+        MapTransitionViewState state = cesiumController.CaptureTransitionViewState();
         if (!state.isValid)
         {
             return;
@@ -181,7 +181,7 @@ public class MapCesiumTransitionManager : MonoBehaviour
             return;
         }
 
-        MapCesiumTransitionViewState state = mapController.CaptureTransitionViewState();
+        MapTransitionViewState state = mapController.CaptureTransitionViewState();
         if (!ShouldSwitchToCesium(state))
         {
             return;
@@ -197,7 +197,7 @@ public class MapCesiumTransitionManager : MonoBehaviour
             return;
         }
 
-        MapCesiumTransitionViewState state = cesiumController.CaptureTransitionViewState();
+        MapTransitionViewState state = cesiumController.CaptureTransitionViewState();
         if (!ShouldSwitchToMap(state))
         {
             return;
@@ -212,12 +212,12 @@ public class MapCesiumTransitionManager : MonoBehaviour
     {
         if (mapController == null)
         {
-            mapController = FindFirstObjectByType<MapControllerEqr>(FindObjectsInactive.Include);
+            mapController = FindFirstObjectByType<FlatmapCameraController>(FindObjectsInactive.Include);
         }
 
         if (cesiumController == null)
         {
-            cesiumController = FindFirstObjectByType<CesiumMapController>(FindObjectsInactive.Include);
+            cesiumController = FindFirstObjectByType<CesiumCameraController>(FindObjectsInactive.Include);
         }
 
         if (cesiumTileset == null)
@@ -248,7 +248,7 @@ public class MapCesiumTransitionManager : MonoBehaviour
         }
     }
 
-    bool ShouldSwitchToMap(MapCesiumTransitionViewState state)
+    bool ShouldSwitchToMap(MapTransitionViewState state)
     {
         if (!state.isValid)
         {
@@ -269,7 +269,7 @@ public class MapCesiumTransitionManager : MonoBehaviour
         return false;
     }
 
-    bool ShouldSwitchToCesium(MapCesiumTransitionViewState state)
+    bool ShouldSwitchToCesium(MapTransitionViewState state)
     {
         if (!state.isValid)
         {
@@ -289,7 +289,7 @@ public class MapCesiumTransitionManager : MonoBehaviour
         return false;
     }
 
-    void BeginCesiumSwitch(MapCesiumTransitionViewState state)
+    void BeginCesiumSwitch(MapTransitionViewState state)
     {
         if (!state.isValid)
         {
@@ -315,7 +315,7 @@ public class MapCesiumTransitionManager : MonoBehaviour
             return;
         }
 
-        MapCesiumTransitionViewState state = mapController.CaptureTransitionViewState();
+        MapTransitionViewState state = mapController.CaptureTransitionViewState();
         if (!ShouldSwitchToCesium(state))
         {
             CancelPendingCesiumSwitch();
@@ -330,7 +330,7 @@ public class MapCesiumTransitionManager : MonoBehaviour
     }
 
     bool TryGetResolutionThresholdReached(
-        MapCesiumTransitionViewState state,
+        MapTransitionViewState state,
         bool switchToMap,
         out bool thresholdReached)
     {
@@ -353,7 +353,7 @@ public class MapCesiumTransitionManager : MonoBehaviour
     }
 
     bool TryGetGlobeFillBoundaryReached(
-        MapCesiumTransitionViewState state,
+        MapTransitionViewState state,
         bool switchToMap,
         out bool boundaryReached)
     {
@@ -402,7 +402,7 @@ public class MapCesiumTransitionManager : MonoBehaviour
     }
 
     bool TryGetFlatMapSourceTexelsPerScreenPixel(
-        MapCesiumTransitionViewState state,
+        MapTransitionViewState state,
         out float texelsPerScreenPixel)
     {
         texelsPerScreenPixel = 0f;
@@ -431,7 +431,7 @@ public class MapCesiumTransitionManager : MonoBehaviour
     }
 
     bool TryGetCesiumRequestedTexelsPerScreenPixel(
-        MapCesiumTransitionViewState state,
+        MapTransitionViewState state,
         out float texelsPerScreenPixel)
     {
         texelsPerScreenPixel = 0f;
@@ -464,7 +464,7 @@ public class MapCesiumTransitionManager : MonoBehaviour
     }
 
     bool TryGetRequestedCesiumRasterZoomLevelForFocus(
-        MapCesiumTransitionViewState state,
+        MapTransitionViewState state,
         out int zoomLevel)
     {
         zoomLevel = -1;
@@ -500,7 +500,7 @@ public class MapCesiumTransitionManager : MonoBehaviour
     }
 
     bool TryGetCesiumVisibleDegreesPerScreenPixel(
-        MapCesiumTransitionViewState state,
+        MapTransitionViewState state,
         out double degreesPerPixelX,
         out double degreesPerPixelY)
     {
@@ -614,7 +614,7 @@ public class MapCesiumTransitionManager : MonoBehaviour
         return cesiumTileset.ComputeLoadProgress() >= minimumCesiumLoadProgress;
     }
 
-    void CompleteCesiumSwitch(MapCesiumTransitionViewState state)
+    void CompleteCesiumSwitch(MapTransitionViewState state)
     {
         isPreparingCesiumSwitch = false;
         SetMode(ViewMode.Cesium);
@@ -638,7 +638,7 @@ public class MapCesiumTransitionManager : MonoBehaviour
             return;
         }
 
-        MapCesiumTransitionViewState state = mapController.CaptureTransitionViewState();
+        MapTransitionViewState state = mapController.CaptureTransitionViewState();
         if (!state.isValid)
         {
             return;

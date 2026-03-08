@@ -543,7 +543,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 40f0829ad76b546b0aa3ba01bd375b28, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CesiumMapController
+  m_EditorClassIdentifier: Assembly-CSharp::CesiumCameraController
   georeference: {fileID: 663349083}
   initializeFromCurrentView: 1
   focusLongitudeDeg: 0

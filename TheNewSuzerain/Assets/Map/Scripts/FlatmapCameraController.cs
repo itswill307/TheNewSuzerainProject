@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Camera))]
-public class MapControllerEqr : MonoBehaviour
+public class FlatmapCameraController : MonoBehaviour
 {
     [Header("Scene References")]
     [SerializeField] Material mapMat;
@@ -659,7 +659,7 @@ public class MapControllerEqr : MonoBehaviour
         return true;
     }
 
-    public MapCesiumTransitionViewState CaptureTransitionViewState()
+    public MapTransitionViewState CaptureTransitionViewState()
     {
         if (cam == null)
         {
@@ -674,7 +674,7 @@ public class MapControllerEqr : MonoBehaviour
 
         float fillZoom = GetWholeGlobeFillZoom();
 
-        return new MapCesiumTransitionViewState
+        return new MapTransitionViewState
         {
             isValid = cam != null,
             focusLongitudeDeg = GetFocusLongitudeDeg(),
@@ -690,7 +690,7 @@ public class MapControllerEqr : MonoBehaviour
         };
     }
 
-    public void ApplyTransitionViewState(MapCesiumTransitionViewState state)
+    public void ApplyTransitionViewState(MapTransitionViewState state)
     {
         if (!state.isValid)
         {
