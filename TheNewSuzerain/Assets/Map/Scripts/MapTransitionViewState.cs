@@ -10,6 +10,8 @@ public struct MapCesiumTransitionViewState
     public float orbitYawDeg;
     public float orbitPitchDeg;
     public float fieldOfViewDeg;
+    public float surfaceDistanceMeters;
+    public float normalizedFillDistance;
     public float visibleLongitudeSpanDeg;
     public float visibleLatitudeSpanDeg;
 }

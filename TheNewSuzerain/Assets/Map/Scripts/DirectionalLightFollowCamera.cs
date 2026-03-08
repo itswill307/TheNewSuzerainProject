@@ -4,6 +4,9 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class DirectionalLightFollowCamera : MonoBehaviour
 {
+    [SerializeField] MapCesiumTransitionManager transitionManager;
+    [SerializeField] CesiumMapController cesiumController;
+
     [Header("Plane")]
     [SerializeField] Transform planeTransform;
     [SerializeField] Vector3 localPlaneNormal = Vector3.back;
@@ -26,11 +29,13 @@ public class DirectionalLightFollowCamera : MonoBehaviour
     {
         attachedLight = GetComponent<Light>();
         warnedNonDirectional = false;
+        ResolveReferences();
     }
 
     void OnValidate()
     {
         attachedLight = GetComponent<Light>();
+        ResolveReferences();
         if (localPlaneNormal.sqrMagnitude < 1e-6f)
         {
             localPlaneNormal = Vector3.back;
@@ -71,6 +76,14 @@ public class DirectionalLightFollowCamera : MonoBehaviour
 
     bool TryGetSourceRotation(out Quaternion sourceRotation)
     {
+        ResolveReferences();
+        if (IsCesiumModeActive() &&
+            cesiumController != null)
+        {
+            sourceRotation = cesiumController.GetBaseCameraLookRotation();
+            return true;
+        }
+
         Vector3 planeNormal = localPlaneNormal.normalized;
         Vector3 planeUp = localPlaneUp.normalized;
         if (planeTransform != null)
@@ -90,5 +103,28 @@ public class DirectionalLightFollowCamera : MonoBehaviour
         Vector3 forward = pointTowardPlane ? -planeNormal : planeNormal;
         sourceRotation = Quaternion.LookRotation(forward, planeUp);
         return true;
+    }
+
+    void ResolveReferences()
+    {
+        if (transitionManager == null)
+        {
+            transitionManager = FindFirstObjectByType<MapCesiumTransitionManager>(FindObjectsInactive.Include);
+        }
+
+        if (cesiumController == null)
+        {
+            cesiumController = FindFirstObjectByType<CesiumMapController>(FindObjectsInactive.Include);
+        }
+    }
+
+    bool IsCesiumModeActive()
+    {
+        if (transitionManager != null)
+        {
+            return transitionManager.ActiveMode == MapCesiumTransitionManager.ViewMode.Cesium;
+        }
+
+        return cesiumController != null && cesiumController.isActiveAndEnabled;
     }
 }

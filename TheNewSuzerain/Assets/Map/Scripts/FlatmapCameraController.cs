@@ -49,23 +49,23 @@ public class MapControllerEqr : MonoBehaviour
     [SerializeField, Tooltip("Degrees of yaw/pitch per pixel when rotating (right mouse drag)")]
     float rotateSensitivity = 0.2f;
     [SerializeField, Tooltip("Minimum and maximum pitch (deg) to keep camera right-side up")]
-    float minPitchDeg = -80f, maxPitchDeg = 80f;
+    float minPitchDeg = -85f, maxPitchDeg = 85f;
     [SerializeField, Tooltip("Minimum and maximum yaw (deg) when rotating (right mouse drag)")]
-    float minYawDeg = -80f, maxYawDeg = 80f;
+    float minYawDeg = -85f, maxYawDeg = 85f;
     [SerializeField, Tooltip("Speed at which camera returns to default when RMB is released (deg/sec)")]
     float returnToDefaultSpeed = 240f;
 
     [Header("Projection Morph")]
-    [SerializeField] float currentMorph = 0f;        // 0=equirectangular, 1=projection target
+    [SerializeField] float currentMorph = 0.5f;        // 0=equirectangular, 1=projection target
     [SerializeField] bool enableZoomMorph = true;    // enable automatic morph based on zoom level
     [SerializeField, Tooltip("Cubic morph vs zoom when enabled.")]
-    bool useCubicMorph = false;
+    bool useCubicMorph = true;
 
     [Header("Projection Mode")]
     [SerializeField, Tooltip("Render the map as a sphere in the shader.")]
     bool sphereMode = false;
     [SerializeField, Tooltip("Automatically switch to sphere mode when the sphere fills the camera width.")]
-    bool autoSphereFromZoom = true;
+    bool autoSphereFromZoom = false;
 
     // ---------- private ----------
     Camera cam;
@@ -170,12 +170,18 @@ public class MapControllerEqr : MonoBehaviour
 
     float GetSphereSwitchZoom()
     {
+        return GetWholeGlobeFillZoom();
+    }
+
+    float GetWholeGlobeFillZoom()
+    {
         if (cam == null) return 0f;
         float verticalFovRad = cam.fieldOfView * Mathf.Deg2Rad;
         float horizontalFovRad = 2f * Mathf.Atan(Mathf.Tan(verticalFovRad * 0.5f) * cam.aspect);
-        float sinHalfHfov = Mathf.Sin(horizontalFovRad * 0.5f);
-        if (sinHalfHfov <= 1e-4f) return 0f;
-        return radius * ((1f / sinHalfHfov) - 1f);
+        float fillingHalfFov = Mathf.Max(verticalFovRad, horizontalFovRad) * 0.5f;
+        float sinFillingHalfFov = Mathf.Sin(fillingHalfFov);
+        if (sinFillingHalfFov <= 1e-4f) return 0f;
+        return radius * ((1f / sinFillingHalfFov) - 1f);
     }
 
     void UpdateMapDimensions()
@@ -596,6 +602,8 @@ public class MapControllerEqr : MonoBehaviour
     public float HeightExaggeration => heightExaggeration;
     public float CurrentMorph => currentMorph;
     public float CurrentZoom => currentZoom;
+    public float MaxZoom => maxZoom;
+    public float WholeGlobeFillDistanceMeters => GetWholeGlobeFillZoom() * kmPerUnit * 1000f;
     public bool SphereMode => sphereMode;
     public float FocusLongitudeDeg => GetFocusLongitudeDeg();
     public float CameraLatitudeDeg => cameraLat;
@@ -603,6 +611,27 @@ public class MapControllerEqr : MonoBehaviour
     public float OrbitPitchDeg => orbitPitchDeg;
     public Camera ControlledCamera => cam != null ? cam : GetComponent<Camera>();
     public Vector2 CurrentUvOffset => new Vector2(focusLon / 360f, 0f);
+    public bool TryGetSourceTexelsPerScreenPixel(out float texelsPerScreenPixel)
+    {
+        texelsPerScreenPixel = 0f;
+        if (mapMat == null)
+        {
+            return false;
+        }
+
+        Texture sourceTexture = mapMat.GetTexture("_MainTex");
+        if (sourceTexture == null || sourceTexture.width <= 0 || sourceTexture.height <= 0)
+        {
+            return false;
+        }
+
+        GetFallbackPanDegreesPerPixel(out float degreesPerPixelX, out float degreesPerPixelY);
+        float texelsPerScreenPixelX = Mathf.Abs(degreesPerPixelX) * (sourceTexture.width / 360f);
+        float texelsPerScreenPixelY = Mathf.Abs(degreesPerPixelY) * (sourceTexture.height / 180f);
+        texelsPerScreenPixel = Mathf.Min(texelsPerScreenPixelX, texelsPerScreenPixelY);
+        return texelsPerScreenPixel > 0f;
+    }
+
     public Quaternion GetBaseCameraLookRotation()
     {
         float lonDeg = GetFocusLongitudeDeg();
@@ -643,6 +672,8 @@ public class MapControllerEqr : MonoBehaviour
             out degreesPerPixelX,
             out degreesPerPixelY);
 
+        float fillZoom = GetWholeGlobeFillZoom();
+
         return new MapCesiumTransitionViewState
         {
             isValid = cam != null,
@@ -652,6 +683,8 @@ public class MapControllerEqr : MonoBehaviour
             orbitYawDeg = orbitYawDeg,
             orbitPitchDeg = orbitPitchDeg,
             fieldOfViewDeg = cam != null ? cam.fieldOfView : 60f,
+            surfaceDistanceMeters = currentZoom * kmPerUnit * 1000f,
+            normalizedFillDistance = fillZoom > 0f ? currentZoom / fillZoom : 0f,
             visibleLongitudeSpanDeg = Mathf.Abs(degreesPerPixelX) * Mathf.Max(1, Screen.width),
             visibleLatitudeSpanDeg = Mathf.Abs(degreesPerPixelY) * Mathf.Max(1, Screen.height)
         };
@@ -682,9 +715,22 @@ public class MapControllerEqr : MonoBehaviour
         orbitYawDeg = Mathf.Clamp(state.orbitYawDeg, minYawDeg, maxYawDeg);
         orbitPitchDeg = Mathf.Clamp(state.orbitPitchDeg, minPitchDeg, maxPitchDeg);
 
-        currentZoom = CalculateZoomFromVisibleSpans(
-            state.visibleLongitudeSpanDeg,
-            state.visibleLatitudeSpanDeg);
+        float metersPerUnit = Mathf.Max(1e-6f, kmPerUnit * 1000f);
+        float fillZoom = GetWholeGlobeFillZoom();
+        if (state.surfaceDistanceMeters > 0f)
+        {
+            currentZoom = state.surfaceDistanceMeters / metersPerUnit;
+        }
+        else if (state.normalizedFillDistance > 0f && fillZoom > 0f)
+        {
+            currentZoom = state.normalizedFillDistance * fillZoom;
+        }
+        else
+        {
+            currentZoom = CalculateZoomFromVisibleSpans(
+                state.visibleLongitudeSpanDeg,
+                state.visibleLatitudeSpanDeg);
+        }
         currentZoom = Mathf.Clamp(currentZoom, minZoom, maxZoom);
 
         RefreshProjectionState();

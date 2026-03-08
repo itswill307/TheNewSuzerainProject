@@ -76,7 +76,6 @@ public class CesiumMapController : MonoBehaviour
     int lastScreenHeight;
     float lastFieldOfView;
     float initialNearClipPlane;
-    float initialFarClipPlane;
 
     void Awake()
     {
@@ -85,7 +84,6 @@ public class CesiumMapController : MonoBehaviour
         georeference = georeference != null ? georeference : GetComponentInParent<CesiumGeoreference>();
         input ??= new InputSystem_Actions();
         initialNearClipPlane = cam.nearClipPlane;
-        initialFarClipPlane = cam.farClipPlane;
 
         if (georeference == null)
         {
@@ -115,7 +113,7 @@ public class CesiumMapController : MonoBehaviour
             UpdateZoomLimits();
             currentDistanceMeters = initialZoomDistanceMeters > 0f
                 ? Mathf.Clamp(initialZoomDistanceMeters, minZoomDistance, maxZoomDistance)
-                : Mathf.Clamp((float)GetWholeGlobeFitDistance(), minZoomDistance, maxZoomDistance);
+                : Mathf.Clamp((float)GetWholeGlobeFillDistance(), minZoomDistance, maxZoomDistance);
         }
 
         CacheCameraShape();
@@ -320,7 +318,7 @@ public class CesiumMapController : MonoBehaviour
             orbitPitchDeg = 0f;
 
             double surfaceDistance = math.max(0.0, llh.z - focusHeightMeters);
-            currentDistanceMeters = (float)(surfaceDistance > 1.0 ? surfaceDistance : GetWholeGlobeFitDistance() * 0.25);
+            currentDistanceMeters = (float)(surfaceDistance > 1.0 ? surfaceDistance : GetWholeGlobeFillDistance() * 0.25);
             return true;
         }
 
@@ -348,20 +346,26 @@ public class CesiumMapController : MonoBehaviour
     void UpdateZoomLimits()
     {
         minZoomDistance = Mathf.Max(minZoomDistanceMeters, cam.nearClipPlane + zoomInBufferMeters);
-        maxZoomDistance = Mathf.Max(minZoomDistance + 1f, (float)GetWholeGlobeFitDistance());
+        maxZoomDistance = Mathf.Max(minZoomDistance + 1f, (float)GetWholeGlobeFillDistance());
     }
 
-    double GetWholeGlobeFitDistance()
+    double GetWholeGlobeFillDistance()
     {
-        float verticalFovRad = cam.fieldOfView * Mathf.Deg2Rad;
+        return GetWholeGlobeFillDistance(cam.fieldOfView);
+    }
+
+    double GetWholeGlobeFillDistance(float fieldOfViewDeg)
+    {
+        float verticalFovRad = fieldOfViewDeg * Mathf.Deg2Rad;
         float horizontalFovRad = 2f * Mathf.Atan(Mathf.Tan(verticalFovRad * 0.5f) * cam.aspect);
-        double sinHalfHfov = math.sin(horizontalFovRad * 0.5f);
-        if (sinHalfHfov <= 1e-5)
+        double fillingHalfFov = math.max(verticalFovRad, horizontalFovRad) * 0.5;
+        double sinFillingHalfFov = math.sin(fillingHalfFov);
+        if (sinFillingHalfFov <= 1e-5)
         {
             return maxEllipsoidRadius * 2.0;
         }
 
-        return maxEllipsoidRadius * ((1.0 / sinHalfHfov) - 1.0);
+        return maxEllipsoidRadius * ((1.0 / sinFillingHalfFov) - 1.0);
     }
 
     Vector3 GetOrbitOffsetEnu()
@@ -622,6 +626,12 @@ public class CesiumMapController : MonoBehaviour
         return new quaternion(value.x, value.y, value.z, value.w);
     }
 
+    Vector3 EarthCenteredEarthFixedToWorld(double3 ecef)
+    {
+        double3 unityLocal = georeference.TransformEarthCenteredEarthFixedPositionToUnity(ecef);
+        return georeference.transform.TransformPoint(ToVector3(unityLocal));
+    }
+
     public MapCesiumTransitionViewState CaptureTransitionViewState()
     {
         if (!EnsureInitialized())
@@ -635,6 +645,8 @@ public class CesiumMapController : MonoBehaviour
             ref degreesPerPixelX,
             ref degreesPerPixelY);
 
+        float fillDistanceMeters = (float)GetWholeGlobeFillDistance();
+
         return new MapCesiumTransitionViewState
         {
             isValid = true,
@@ -644,6 +656,8 @@ public class CesiumMapController : MonoBehaviour
             orbitYawDeg = orbitYawDeg,
             orbitPitchDeg = orbitPitchDeg,
             fieldOfViewDeg = cam.fieldOfView,
+            surfaceDistanceMeters = currentDistanceMeters,
+            normalizedFillDistance = fillDistanceMeters > 0f ? currentDistanceMeters / fillDistanceMeters : 0f,
             visibleLongitudeSpanDeg = Mathf.Abs(degreesPerPixelX) * Mathf.Max(1, Screen.width),
             visibleLatitudeSpanDeg = Mathf.Abs(degreesPerPixelY) * Mathf.Max(1, Screen.height)
         };
@@ -666,10 +680,21 @@ public class CesiumMapController : MonoBehaviour
         orbitPitchDeg = Mathf.Clamp(state.orbitPitchDeg, minPitchDeg, maxPitchDeg);
 
         UpdateZoomLimits();
-        currentDistanceMeters = CalculateDistanceFromVisibleSpan(
-            (float)focusLatitudeDeg,
-            state.visibleLongitudeSpanDeg,
-            state.visibleLatitudeSpanDeg);
+        if (state.surfaceDistanceMeters > 0f)
+        {
+            currentDistanceMeters = state.surfaceDistanceMeters;
+        }
+        else if (state.normalizedFillDistance > 0f)
+        {
+            currentDistanceMeters = state.normalizedFillDistance * (float)GetWholeGlobeFillDistance();
+        }
+        else
+        {
+            currentDistanceMeters = CalculateDistanceFromVisibleSpan(
+                (float)focusLatitudeDeg,
+                state.visibleLongitudeSpanDeg,
+                state.visibleLatitudeSpanDeg);
+        }
         currentDistanceMeters = Mathf.Clamp(currentDistanceMeters, minZoomDistance, maxZoomDistance);
 
         ApplyCameraPose();
@@ -680,8 +705,45 @@ public class CesiumMapController : MonoBehaviour
     public double FocusLatitudeDeg => focusLatitudeDeg;
     public double FocusHeightMeters => focusHeightMeters;
     public float CurrentDistanceMeters => currentDistanceMeters;
+    public float WholeGlobeFillDistanceMeters => EnsureInitialized() ? (float)GetWholeGlobeFillDistance() : 0f;
     public float OrbitYawDeg => orbitYawDeg;
     public float OrbitPitchDeg => orbitPitchDeg;
+    public Quaternion GetBaseCameraLookRotation()
+    {
+        if (!EnsureInitialized())
+        {
+            return transform.rotation;
+        }
+
+        double3 focusLlh = new double3(focusLongitudeDeg, focusLatitudeDeg, focusHeightMeters);
+        double3 focusEcef = ellipsoid.LongitudeLatitudeHeightToCenteredFixed(focusLlh);
+        EnuBasis focusBasis = GetEnuBasis(focusEcef);
+        double3 cameraEcef = focusEcef + focusBasis.Up * currentDistanceMeters;
+        double3 forwardEcef = Normalize(focusEcef - cameraEcef);
+        EnuBasis cameraBasis = GetEnuBasis(cameraEcef);
+
+        double3 upEcef = Normalize(ProjectOnPlane(cameraBasis.North, forwardEcef));
+        if (math.lengthsq(upEcef) < 1e-10)
+        {
+            upEcef = Normalize(ProjectOnPlane(cameraBasis.Up, forwardEcef));
+        }
+
+        Vector3 cameraWorld = EarthCenteredEarthFixedToWorld(cameraEcef);
+        Vector3 focusWorld = EarthCenteredEarthFixedToWorld(focusEcef);
+        Vector3 forwardWorld = focusWorld - cameraWorld;
+        Vector3 upWorld = EarthCenteredEarthFixedToWorld(cameraEcef + upEcef * 1000.0) - cameraWorld;
+        if (forwardWorld.sqrMagnitude < 1e-6f)
+        {
+            return transform.rotation;
+        }
+
+        if (upWorld.sqrMagnitude < 1e-6f)
+        {
+            upWorld = Vector3.up;
+        }
+
+        return Quaternion.LookRotation(forwardWorld.normalized, upWorld.normalized);
+    }
 
     bool EnsureInitialized()
     {
@@ -710,19 +772,30 @@ public class CesiumMapController : MonoBehaviour
             initialNearClipPlane = cam.nearClipPlane;
         }
 
-        if (initialFarClipPlane <= 0f)
-        {
-            initialFarClipPlane = cam.farClipPlane;
-        }
-
         return true;
     }
 
-    float CalculateDistanceFromVisibleSpan(float latitudeDeg, float longitudeSpanDeg, float latitudeSpanDeg)
+    float CalculateDistanceFromVisibleSpan(
+        float latitudeDeg,
+        float longitudeSpanDeg,
+        float latitudeSpanDeg)
+    {
+        return CalculateDistanceFromVisibleSpan(
+            latitudeDeg,
+            longitudeSpanDeg,
+            latitudeSpanDeg,
+            cam.fieldOfView);
+    }
+
+    float CalculateDistanceFromVisibleSpan(
+        float latitudeDeg,
+        float longitudeSpanDeg,
+        float latitudeSpanDeg,
+        float fieldOfViewDeg)
     {
         float safeLatitudeSpan = Mathf.Max(0.01f, latitudeSpanDeg);
         float safeLongitudeSpan = Mathf.Max(0.01f, longitudeSpanDeg);
-        float verticalFovRad = cam.fieldOfView * Mathf.Deg2Rad;
+        float verticalFovRad = fieldOfViewDeg * Mathf.Deg2Rad;
         float horizontalFovRad = 2f * Mathf.Atan(Mathf.Tan(verticalFovRad * 0.5f) * cam.aspect);
         float tanHalfVertical = Mathf.Tan(verticalFovRad * 0.5f);
         float tanHalfHorizontal = Mathf.Tan(horizontalFovRad * 0.5f);

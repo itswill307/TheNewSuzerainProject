@@ -27,6 +27,12 @@ public class ProvincePickerEqr : MonoBehaviour
     Renderer rend;
     readonly System.Collections.Generic.List<Renderer> targetRenderers = new System.Collections.Generic.List<Renderer>(8);
     readonly System.Collections.Generic.List<Material> targetMaterials = new System.Collections.Generic.List<Material>(8);
+    Texture2D cachedProvinceTexture;
+    Color32[] provincePixels;
+    int provinceWidth;
+    int provinceHeight;
+    bool canSampleProvinceOnCpu;
+    bool hasWarnedGpuFallback;
     RenderTexture provinceSampleRt;
     Texture2D provinceSampleCpuTex;
     InputSystem_Actions input;
@@ -42,31 +48,31 @@ public class ProvincePickerEqr : MonoBehaviour
             Debug.LogError("Province ID texture must be assigned.");
             enabled = false; return;
         }
-        EnsureGpuSamplingResources();
+        RefreshProvinceSamplingMode();
 
         // Ensure material has the Province ID texture bound
         CollectTargetMaterials();
         ApplyProvinceIdTextureToAll();
-        SetIntOnAll(selectedIdProp, -1);
-        SetIntOnAll(hoverIdProp, -1);
+        ApplySharedSelectionState();
     }
 
     void OnEnable()
     {
         input.Enable();
-        EnsureGpuSamplingResources();
+        RefreshProvinceSamplingMode();
+        CollectTargetMaterials();
+        ApplyProvinceIdTextureToAll();
+        ApplySharedSelectionState();
     }
 
     void OnDisable()
     {
         input.Disable();
-        ClearSelectionState();
         ReleaseGpuSamplingResources();
     }
 
     void OnDestroy()
     {
-        ClearSelectionState();
         ReleaseGpuSamplingResources();
     }
 
@@ -75,6 +81,7 @@ public class ProvincePickerEqr : MonoBehaviour
         if (!cam || !mapMaterial) return;
         CollectTargetMaterials();
         ApplyProvinceIdTextureToAll();
+        ApplySharedSelectionState();
 
         if (TryGetUVUnderCursor(out Vector2 uv))
         {
@@ -95,35 +102,45 @@ public class ProvincePickerEqr : MonoBehaviour
             int pid = SampleProvinceId(u, v);
             if (pid < 0)
             {
-                SetIntOnAll(hoverIdProp, -1);
+                MapProvinceSelectionState.ClearHover();
+                ApplySharedSelectionState();
                 return;
             }
 
             // Block ocean/background selection/hover
             if (blockOcean && pid == oceanId)
             {
-                SetIntOnAll(hoverIdProp, -1);
-                // Ignore clicks on ocean
+                if (input.Map.LMB.WasPressedThisFrame())
+                {
+                    MapProvinceSelectionState.ClearSelected();
+                }
+                MapProvinceSelectionState.ClearHover();
+                ApplySharedSelectionState();
                 return;
             }
 
             if (highlightHovered)
             {
-                SetIntOnAll(hoverIdProp, pid);               // live hover id
-                SetColorOnAll(hoverColorProp, hoverColor);   // hover color
+                MapProvinceSelectionState.SetHover(pid);
             }
+            else
+            {
+                MapProvinceSelectionState.ClearHover();
+            }
+            ApplySharedSelectionState();
 
             if (input.Map.LMB.WasPressedThisFrame())
             {
-                SetIntOnAll(selectedIdProp, pid);               // commit selection
-                SetColorOnAll(highlightColorProp, highlightColor);
+                MapProvinceSelectionState.SetSelected(pid);      // commit selection
+                ApplySharedSelectionState();
                 Debug.Log($"Clicked province ID = {pid}");
             }
         }
         else
         {
             // No hover
-            SetIntOnAll(hoverIdProp, -1);
+            MapProvinceSelectionState.ClearHover();
+            ApplySharedSelectionState();
         }
     }
 
@@ -192,11 +209,12 @@ public class ProvincePickerEqr : MonoBehaviour
         }
     }
 
-    void ClearSelectionState()
+    void ApplySharedSelectionState()
     {
-        CollectTargetMaterials();
-        SetIntOnAll(selectedIdProp, -1);
-        SetIntOnAll(hoverIdProp, -1);
+        SetIntOnAll(selectedIdProp, MapProvinceSelectionState.SelectedId);
+        SetIntOnAll(hoverIdProp, MapProvinceSelectionState.HoverId);
+        SetColorOnAll(highlightColorProp, highlightColor);
+        SetColorOnAll(hoverColorProp, hoverColor);
     }
 
     bool TryGetUVUnderCursor(out Vector2 uv)
@@ -465,6 +483,18 @@ public class ProvincePickerEqr : MonoBehaviour
 
     int SampleProvinceId(float u, float v)
     {
+        RefreshProvinceSamplingMode();
+        if (canSampleProvinceOnCpu)
+        {
+            int x = Mathf.Clamp((int)(u * provinceWidth), 0, provinceWidth - 1);
+            int y = Mathf.Clamp((int)(v * provinceHeight), 0, provinceHeight - 1);
+            int index = y * provinceWidth + x;
+            if ((uint)index < (uint)provincePixels.Length)
+            {
+                return DecodeProvinceId(provincePixels[index]);
+            }
+        }
+
         if (!EnsureGpuSamplingResources())
         {
             return -1;
@@ -486,7 +516,7 @@ public class ProvincePickerEqr : MonoBehaviour
         }
 
         Color32 c = provinceSampleCpuTex.GetPixel(0, 0);
-        return c.r | (c.g << 8) | (c.b << 16);
+        return DecodeProvinceId(c);
     }
 
     bool EnsureGpuSamplingResources()
@@ -509,6 +539,54 @@ public class ProvincePickerEqr : MonoBehaviour
         }
 
         return provinceSampleRt != null && provinceSampleCpuTex != null;
+    }
+
+    void RefreshProvinceSamplingMode()
+    {
+        if (cachedProvinceTexture == provinceIdTex)
+        {
+            return;
+        }
+
+        cachedProvinceTexture = provinceIdTex;
+        provincePixels = null;
+        provinceWidth = 0;
+        provinceHeight = 0;
+        canSampleProvinceOnCpu = false;
+        hasWarnedGpuFallback = false;
+
+        if (provinceIdTex == null)
+        {
+            return;
+        }
+
+        if (provinceIdTex.isReadable)
+        {
+            provincePixels = provinceIdTex.GetPixels32();
+            provinceWidth = provinceIdTex.width;
+            provinceHeight = provinceIdTex.height;
+            canSampleProvinceOnCpu =
+                provincePixels != null &&
+                provincePixels.Length == provinceWidth * provinceHeight &&
+                provinceWidth > 0 &&
+                provinceHeight > 0;
+        }
+
+        if (!canSampleProvinceOnCpu)
+        {
+            EnsureGpuSamplingResources();
+            if (!hasWarnedGpuFallback)
+            {
+                Debug.LogWarning(
+                    $"ProvincePickerEqr: Province ID texture '{provinceIdTex.name}' is not readable; using slower GPU readback fallback.");
+                hasWarnedGpuFallback = true;
+            }
+        }
+    }
+
+    static int DecodeProvinceId(Color32 pixel)
+    {
+        return pixel.r | (pixel.g << 8) | (pixel.b << 16);
     }
 
     void ReleaseGpuSamplingResources()

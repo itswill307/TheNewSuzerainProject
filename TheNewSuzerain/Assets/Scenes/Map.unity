@@ -148,7 +148,7 @@ Transform:
   m_GameObject: {fileID: 101723291}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -14076.853}
+  m_LocalPosition: {x: 0, y: 0, z: -13797.763}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -238,7 +238,7 @@ Camera:
     width: 1
     height: 1
   near clip plane: 0.3
-  far clip plane: 36386.38
+  far clip plane: 36107.29
   field of view: 60
   orthographic: 0
   orthographic size: 5
@@ -291,10 +291,10 @@ MonoBehaviour:
   panKeySpeed: 1000
   panDragSpeed: 1
   rotateSensitivity: 0.2
-  minPitchDeg: -80
-  maxPitchDeg: 80
-  minYawDeg: -80
-  maxYawDeg: 80
+  minPitchDeg: -85
+  maxPitchDeg: 85
+  minYawDeg: -85
+  maxYawDeg: 85
   returnToDefaultSpeed: 240
   currentMorph: 0.5
   enableZoomMorph: 1
@@ -353,9 +353,9 @@ MonoBehaviour:
   _maximumSimultaneousTileLoads: 20
   _subTileCacheBytes: 16777216
   _url: http://localhost:8081
-  _specifyZoomLevels: 0
+  _specifyZoomLevels: 1
   _minimumLevel: 0
-  _maximumLevel: 10
+  _maximumLevel: 7
 --- !u!114 &262332788
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -428,7 +428,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 559662400}
   serializedVersion: 2
-  m_LocalRotation: {x: 1.3877788e-17, y: 5.729802e-17, z: -4.537507e-17, w: 1}
+  m_LocalRotation: {x: 1.3877788e-17, y: 1.02420637e-16, z: -4.5934365e-17, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -495,8 +495,8 @@ MonoBehaviour:
   _localToGlobeFixedMatrix:
     c0:
       x: 0.9647534819407176
-      y: -0.26315531361395944
-      z: -0.0000000000000001281862785343573
+      y: -0.2631553136139595
+      z: -0.0000000000000002162492365872687
       w: 0
     c1:
       x: -0.2023645503245802
@@ -504,7 +504,7 @@ MonoBehaviour:
       z: 0.6392573986170699
       w: 0
     c2:
-      x: 0.16822398121311902
+      x: 0.1682239812131191
       y: 0.6167258011721835
       z: 0.7689928337204038
       w: 0
@@ -770,6 +770,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1923a6cd6fb50764f9b31a2686ef3aec, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DirectionalLightFollowCamera
+  transitionManager: {fileID: 1382214566}
+  cesiumController: {fileID: 559662402}
   planeTransform: {fileID: 0}
   localPlaneNormal: {x: 0, y: 0, z: -1}
   localPlaneUp: {x: 0, y: 1, z: 0}
@@ -807,6 +809,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MapCesiumTransitionManager
   mapController: {fileID: 101723297}
   cesiumController: {fileID: 559662402}
+  cesiumTileset: {fileID: 262332788}
+  cesiumRasterOverlay: {fileID: 262332787}
+  localTerrainServer: {fileID: 1872131672}
   mapCamera: {fileID: 101723295}
   cesiumCamera: {fileID: 559662406}
   mapModeBehaviours: []
@@ -815,12 +820,18 @@ MonoBehaviour:
   - {fileID: 1554884627}
   cesiumModeObjects:
   - {fileID: 2010412337}
-  switchToCesiumLatitudeSpanDeg: 20
-  switchToMapLatitudeSpanDeg: 21
+  switchToCesiumFitFraction: 0.95
   minSecondsBetweenSwitches: 0.4
+  switchToCesiumResolutionHysteresis: 0.05
   keepCesiumWarmInBackground: 1
   cesiumWarmupSeconds: 0.2
-  hiddenCesiumRenderTextureSize: 256
+  waitForCesiumLoadProgress: 1
+  minimumCesiumLoadProgress: 90
+  cesiumRasterRootTilesX: 2
+  cesiumRasterRootTilesY: 1
+  cesiumRasterTileWidth: 256
+  cesiumRasterTileHeight: 256
+  hiddenCesiumRenderTextureSize: 512
   startingMode: 0
   manageMainCameraTag: 1
 --- !u!4 &1382214567
@@ -956,6 +967,59 @@ MonoBehaviour:
   hoverColor: {r: 0, g: 1, b: 1, a: 0.5}
   blockOcean: 1
   oceanId: 0
+--- !u!1 &1563665705
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1563665706}
+  - component: {fileID: 1563665708}
+  m_Layer: 0
+  m_Name: ProvincePicker
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1563665706
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1563665705}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2010412340}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1563665708
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1563665705}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e78c51c36e877ed428652ef2ad5d5cbf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProvincePickerCesium
+  georeference: {fileID: 2010412339}
+  cesiumCamera: {fileID: 559662406}
+  transitionManager: {fileID: 1382214566}
+  provinceIdTex: {fileID: 2800000, guid: bb93bd5c545c348dc9ea5b733f96a3a7, type: 3}
+  highlightHovered: 1
+  highlightColor: {r: 1, g: 0.75, b: 0, a: 0.6}
+  hoverColor: {r: 0, g: 1, b: 1, a: 0.5}
+  blockOcean: 1
+  oceanId: 0
 --- !u!1 &1872131671
 GameObject:
   m_ObjectHideFlags: 0
@@ -1082,6 +1146,7 @@ Transform:
   m_Children:
   - {fileID: 262332786}
   - {fileID: 559662401}
+  - {fileID: 1563665706}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807

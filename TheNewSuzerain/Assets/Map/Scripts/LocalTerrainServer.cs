@@ -6,7 +6,6 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using UnityEngine;
-
 public class LocalTerrainServer : MonoBehaviour
 {
     private sealed class CacheItem
@@ -27,7 +26,6 @@ public class LocalTerrainServer : MonoBehaviour
         public string Name;
         public int Port;
         public string SourcePath;
-        public bool SourceIsArchive;
         public FileStream ArchiveStream;
         public ZipArchive Archive;
         public Dictionary<string, DataEntry> EntryIndex;
@@ -37,6 +35,7 @@ public class LocalTerrainServer : MonoBehaviour
         public LinkedList<string> TileCacheLru;
         public int TileCacheLimit;
         public int MaxTerrainZoom = -1;
+        public int MaxRasterZoom = -1;
         public bool LoggedOutOfRangeTerrainWarning;
         public int MissingRequestLogCount;
     }
@@ -55,6 +54,24 @@ public class LocalTerrainServer : MonoBehaviour
     [SerializeField, Min(0)] private int maxCachedTilesPerServer = 512;
     [SerializeField] private int maxMissingRequestLogs = 20;
     [SerializeField] private bool logMissingRequests = false;
+    public bool TryGetSecondaryMaxRasterZoom(out int zoomLevel)
+    {
+        return TryGetMaxRasterZoom(secondaryPort, out zoomLevel);
+    }
+
+    public bool TryGetMaxRasterZoom(int serverPort, out int zoomLevel)
+    {
+        zoomLevel = -1;
+
+        ServerState server = FindServerByPort(serverPort);
+        if (server == null)
+        {
+            return false;
+        }
+
+        zoomLevel = server.MaxRasterZoom;
+        return zoomLevel >= 0;
+    }
 
     void Start()
     {
@@ -187,6 +204,7 @@ public class LocalTerrainServer : MonoBehaviour
         long totalBytes;
         int fileCount;
         int maxTerrainZoom;
+        int maxRasterZoom;
         bool sourceIsArchive;
         bool usedManifestIndex;
 
@@ -203,6 +221,7 @@ public class LocalTerrainServer : MonoBehaviour
                 out fileCount,
                 out totalBytes,
                 out maxTerrainZoom,
+                out maxRasterZoom,
                 out sourceIsArchive,
                 out usedManifestIndex))
             {
@@ -271,7 +290,6 @@ public class LocalTerrainServer : MonoBehaviour
             Name = name,
             Port = serverPort,
             SourcePath = sourcePath,
-            SourceIsArchive = sourceIsArchive,
             ArchiveStream = archiveStream,
             Archive = archive,
             EntryIndex = entryIndex,
@@ -280,6 +298,7 @@ public class LocalTerrainServer : MonoBehaviour
             TileCacheLru = new LinkedList<string>(),
             TileCacheLimit = Math.Max(0, maxCachedTilesPerServer),
             MaxTerrainZoom = maxTerrainZoom,
+            MaxRasterZoom = maxRasterZoom,
             LoggedOutOfRangeTerrainWarning = false,
             MissingRequestLogCount = 0
         };
@@ -291,6 +310,11 @@ public class LocalTerrainServer : MonoBehaviour
         if (maxTerrainZoom >= 0)
         {
             Debug.Log($"LocalTerrainServer: {name} detected max terrain zoom {maxTerrainZoom}.");
+        }
+
+        if (maxRasterZoom >= 0)
+        {
+            Debug.Log($"LocalTerrainServer: {name} detected max raster zoom {maxRasterZoom}.");
         }
 
         return true;
@@ -307,6 +331,7 @@ public class LocalTerrainServer : MonoBehaviour
         out int fileCount,
         out long totalBytes,
         out int maxTerrainZoom,
+        out int maxRasterZoom,
         out bool sourceIsArchive,
         out bool usedManifestIndex)
     {
@@ -316,6 +341,7 @@ public class LocalTerrainServer : MonoBehaviour
         fileCount = 0;
         totalBytes = 0;
         maxTerrainZoom = -1;
+        maxRasterZoom = -1;
         sourceIsArchive = false;
         usedManifestIndex = false;
 
@@ -327,7 +353,8 @@ public class LocalTerrainServer : MonoBehaviour
                 out entryIndex,
                 out fileCount,
                 out totalBytes,
-                out maxTerrainZoom))
+                out maxTerrainZoom,
+                out maxRasterZoom))
             {
                 usedManifestIndex = true;
                 return true;
@@ -359,11 +386,23 @@ public class LocalTerrainServer : MonoBehaviour
                 {
                     maxTerrainZoom = zoom;
                 }
+
+                if (IsRasterImageKey(key) &&
+                    TryGetZoomFromKey(key, out int rasterZoom) &&
+                    rasterZoom > maxRasterZoom)
+                {
+                    maxRasterZoom = rasterZoom;
+                }
             }
 
             if (useDirectoryManifestIndex && writeDirectoryManifestWhenMissing)
             {
-                TryWriteDirectoryManifest(sourcePath, directoryManifestFileName, entryIndex, maxTerrainZoom);
+                TryWriteDirectoryManifest(
+                    sourcePath,
+                    directoryManifestFileName,
+                    entryIndex,
+                    maxTerrainZoom,
+                    maxRasterZoom);
             }
 
             return true;
@@ -416,6 +455,13 @@ public class LocalTerrainServer : MonoBehaviour
                 {
                     maxTerrainZoom = zoom;
                 }
+
+                if (IsRasterImageKey(key) &&
+                    TryGetZoomFromKey(key, out int rasterZoom) &&
+                    rasterZoom > maxRasterZoom)
+                {
+                    maxRasterZoom = rasterZoom;
+                }
             }
 
             return true;
@@ -436,6 +482,7 @@ public class LocalTerrainServer : MonoBehaviour
             fileCount = 0;
             totalBytes = 0;
             maxTerrainZoom = -1;
+            maxRasterZoom = -1;
             throw;
         }
     }
@@ -461,12 +508,14 @@ public class LocalTerrainServer : MonoBehaviour
         out Dictionary<string, ServerState.DataEntry> entryIndex,
         out int fileCount,
         out long totalBytes,
-        out int maxTerrainZoom)
+        out int maxTerrainZoom,
+        out int maxRasterZoom)
     {
         entryIndex = null;
         fileCount = 0;
         totalBytes = 0;
         maxTerrainZoom = -1;
+        maxRasterZoom = -1;
 
         if (string.IsNullOrWhiteSpace(sourcePath))
         {
@@ -484,6 +533,7 @@ public class LocalTerrainServer : MonoBehaviour
         string rootWithSeparator = rootPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
         var parsedIndex = new Dictionary<string, ServerState.DataEntry>(StringComparer.Ordinal);
         bool hasMaxZoomHeader = false;
+        bool hasMaxRasterZoomHeader = false;
 
         foreach (string rawLine in File.ReadLines(manifestPath))
         {
@@ -506,6 +556,14 @@ public class LocalTerrainServer : MonoBehaviour
                 {
                     maxTerrainZoom = parsedMaxZoom;
                     hasMaxZoomHeader = true;
+                }
+
+                const string maxRasterZoomPrefix = "#maxRasterZoom=";
+                if (line.StartsWith(maxRasterZoomPrefix, StringComparison.OrdinalIgnoreCase) &&
+                    int.TryParse(line.Substring(maxRasterZoomPrefix.Length), out int parsedMaxRasterZoom))
+                {
+                    maxRasterZoom = parsedMaxRasterZoom;
+                    hasMaxRasterZoomHeader = true;
                 }
                 continue;
             }
@@ -563,6 +621,14 @@ public class LocalTerrainServer : MonoBehaviour
             {
                 maxTerrainZoom = zoom;
             }
+
+            if (!hasMaxRasterZoomHeader &&
+                IsRasterImageKey(key) &&
+                TryGetZoomFromKey(key, out int rasterZoom) &&
+                rasterZoom > maxRasterZoom)
+            {
+                maxRasterZoom = rasterZoom;
+            }
         }
 
         if (parsedIndex.Count == 0)
@@ -578,7 +644,8 @@ public class LocalTerrainServer : MonoBehaviour
         string sourcePath,
         string manifestFileName,
         Dictionary<string, ServerState.DataEntry> entryIndex,
-        int maxTerrainZoom)
+        int maxTerrainZoom,
+        int maxRasterZoom)
     {
         if (string.IsNullOrWhiteSpace(sourcePath) || entryIndex == null)
         {
@@ -598,6 +665,7 @@ public class LocalTerrainServer : MonoBehaviour
             {
                 writer.WriteLine("# LocalTerrainServer manifest v1");
                 writer.WriteLine($"#maxTerrainZoom={maxTerrainZoom}");
+                writer.WriteLine($"#maxRasterZoom={maxRasterZoom}");
 
                 foreach (var pair in entryIndex)
                 {
@@ -845,6 +913,27 @@ public class LocalTerrainServer : MonoBehaviour
         {
             CloseResponseSafe(response);
         }
+    }
+
+    private ServerState FindServerByPort(int serverPort)
+    {
+        for (int i = 0; i < _servers.Count; i++)
+        {
+            if (_servers[i] != null && _servers[i].Port == serverPort)
+            {
+                return _servers[i];
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsRasterImageKey(string key)
+    {
+        return key.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+               key.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+               key.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+               key.EndsWith(".webp", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string GetContentTypeFromKey(string key)

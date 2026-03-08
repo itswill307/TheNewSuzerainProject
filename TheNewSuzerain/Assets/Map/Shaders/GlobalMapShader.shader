@@ -17,7 +17,6 @@ Shader "GlobalMapShader"
         [Toggle] _Sphere ("Sphere Mode", Float) = 0
 
         [Header(Height)]
-        _HeightBias ("Height Bias", Float) = 0
         _HeightMinKm ("Height Min (km)", Float) = -10.994
         _HeightMaxKm ("Height Max (km)", Float) = 8.849
         _HeightExaggeration ("Height Exaggeration", Float) = 1
@@ -76,13 +75,11 @@ Shader "GlobalMapShader"
             float4 _HeightTex_TexelSize;
 
             CBUFFER_START(UnityPerMaterial)
-                float4 _MainTex_ST;
                 float4 _HighlightColor;
                 float4 _HoverColor;
                 float2 _UVOffset;
                 float _Radius;
                 float _Morph;
-                float _HeightBias;
                 float _HeightMinKm;
                 float _HeightMaxKm;
                 float _HeightExaggeration;
@@ -112,32 +109,28 @@ Shader "GlobalMapShader"
                 return (r8 | (g8 << 8) | (b8 << 16));
             }
 
-            void ProvinceIdMaskFromRGB_float(float3 idRGB, float selectedId, out float mask, out float idOut)
+            float ProvinceIdMaskFromRGB(float3 idRGB, float selectedId)
             {
                 uint provinceId = DecodeProvinceId24(idRGB);
-                idOut = (float)provinceId;
                 float maskEnabled = step(0.0, selectedId + 0.5);
                 uint selectedIdInt = (uint)max(0.0, round(selectedId));
-                mask = maskEnabled * ((provinceId == selectedIdInt) ? 1.0 : 0.0);
+                return maskEnabled * ((provinceId == selectedIdInt) ? 1.0 : 0.0);
             }
 
-            void ProvinceHoverSelectFromRGB_float(
+            float3 ProvinceHoverSelectFromRGB(
                 float3 idRGB, float selectedId, float4 highlightColor,
                 float hoverId, float4 hoverColor,
-                float3 baseColor, out float3 outColor)
+                float3 baseColor)
             {
-                float selectMask, selectedIdDecoded;
-                ProvinceIdMaskFromRGB_float(idRGB, selectedId, selectMask, selectedIdDecoded);
-
-                float hoverMask, hoverIdDecoded;
-                ProvinceIdMaskFromRGB_float(idRGB, hoverId, hoverMask, hoverIdDecoded);
+                float selectMask = ProvinceIdMaskFromRGB(idRGB, selectedId);
+                float hoverMask = ProvinceIdMaskFromRGB(idRGB, hoverId);
                 float hoverEnabled = step(0.0, hoverId + 0.5);
                 hoverMask *= hoverEnabled;
 
                 float3 color = baseColor;
                 color = lerp(color, color + hoverColor.rgb * hoverColor.a, hoverMask);
                 color = lerp(color, color + highlightColor.rgb * highlightColor.a, selectMask);
-                outColor = color;
+                return color;
             }
 
             float AngularDeltaLon(float lonA, float lonB)
@@ -408,21 +401,18 @@ Shader "GlobalMapShader"
                 float3 baseColor = SampleBaseColor(uv);
                 float4 idSample = SAMPLE_TEXTURE2D(_ProvinceIDTex, sampler_ProvinceIDTex, uv);
 
-                float3 outColor;
-                ProvinceHoverSelectFromRGB_float(
+                float3 outColor = ProvinceHoverSelectFromRGB(
                     idSample.rgb,
                     _SelectedID,
                     _HighlightColor,
                     _HoverID,
                     _HoverColor,
-                    baseColor,
-                    outColor
-                );
+                    baseColor);
 
                 float3 normalWS = normalize(input.normalWS);
                 Light mainLight = GetMainLight();
                 float NdotL = saturate(dot(normalWS, mainLight.direction));
-                float3 lighting = 0.25.xxx + (NdotL * mainLight.color);
+                float3 lighting = NdotL * mainLight.color;
 
                 return float4(outColor * lighting, 1.0);
             }

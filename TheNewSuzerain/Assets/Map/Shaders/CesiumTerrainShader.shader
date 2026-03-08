@@ -11,8 +11,8 @@ Shader "CesiumLandcoverOverlayLUT"
         _LandcoverLUT ("Landcover LUT (256x1)", 2D) = "white" {}
         [Toggle] _OverlayIndexedSRGB ("Overlay Index Texture Is sRGB", Float) = 1
         [Toggle] _FlipOverlayV ("Flip Overlay V", Float) = 1
-        [Toggle] _UseOverlayAlpha ("Use Overlay Alpha As Valid Mask", Float) = 1
-        _FallbackColor ("Fallback Color", Color) = (0.2, 0.2, 0.2, 1)
+        [Header(Selection)]
+        _ProvinceIDTex ("Province ID Map", 2D) = "black" {}
     }
 
     SubShader
@@ -47,14 +47,29 @@ Shader "CesiumLandcoverOverlayLUT"
             TEXTURE2D(_LandcoverLUT);
             SAMPLER(sampler_LandcoverLUT);
 
+            TEXTURE2D(_ProvinceIDTex);
+            SAMPLER(sampler_ProvinceIDTex);
+
+            // Set globally via Shader.SetGlobal by CesiumProvinceShaderSetup / ProvincePickerCesium.
+            // NOT in Properties block so Cesium per-tile material clones don't override with defaults.
+            float4 _CesiumGlobeCenterWorld;
+            float4 _CesiumGlobeCenterEcef;
+            float4 _CesiumOneOverRadiiSquared;
+            float4x4 _CesiumWorldDirToEcef;
+            float4 _HighlightColor;
+            float4 _HoverColor;
+            float _SelectedID;
+            float _HoverID;
+
             CBUFFER_START(UnityPerMaterial)
                 float4 _overlayTranslationAndScale_0;
                 float _overlayTextureCoordinateIndex_0;
                 float _OverlayIndexedSRGB;
                 float _FlipOverlayV;
-                float _UseOverlayAlpha;
-                float4 _FallbackColor;
             CBUFFER_END
+
+            static const float PI_ = 3.14159265359;
+            static const float TWO_PI_ = 6.28318530718;
 
             struct Attributes
             {
@@ -68,7 +83,8 @@ Shader "CesiumLandcoverOverlayLUT"
             struct Varyings
             {
                 float4 positionCS : SV_POSITION;
-                float2 overlayUV : TEXCOORD0;
+                float2 overlayUV  : TEXCOORD0;
+                float3 positionWS : TEXCOORD1;
             };
 
             float2 SelectOverlayUV(Attributes input, float indexFloat)
@@ -104,30 +120,80 @@ Shader "CesiumLandcoverOverlayLUT"
                 return (nearestTexel + 0.5) / texSize;
             }
 
+            inline uint DecodeProvinceId24(float3 rgb)
+            {
+                float3 rgb255 = round(saturate(rgb) * 255.0);
+                uint r8 = (uint)rgb255.r;
+                uint g8 = (uint)rgb255.g;
+                uint b8 = (uint)rgb255.b;
+                return (r8 | (g8 << 8) | (b8 << 16));
+            }
+
+            float ProvinceSelectionMask(float3 idRGB, float selectedId)
+            {
+                float maskEnabled = step(0.0, selectedId + 0.5);
+                uint provinceId = DecodeProvinceId24(idRGB);
+                uint selectedIdInt = (uint)max(0.0, round(selectedId));
+                return maskEnabled * ((provinceId == selectedIdInt) ? 1.0 : 0.0);
+            }
+
+            float3 ApplyProvinceHoverSelect(float3 idRGB, float3 baseColor)
+            {
+                float selectMask = ProvinceSelectionMask(idRGB, _SelectedID);
+                float hoverEnabled = step(0.0, _HoverID + 0.5);
+                float hoverMask = ProvinceSelectionMask(idRGB, _HoverID) * hoverEnabled;
+
+                float3 color = baseColor;
+                color = lerp(color, color + _HoverColor.rgb * _HoverColor.a, hoverMask);
+                color = lerp(color, color + _HighlightColor.rgb * _HighlightColor.a, selectMask);
+                return color;
+            }
+
             Varyings vert(Attributes input)
             {
                 Varyings output;
                 output.positionCS = TransformObjectToHClip(input.positionOS);
 
+                // Overlay UV for landcover
                 float2 rawUV = SelectOverlayUV(input, _overlayTextureCoordinateIndex_0);
                 float2 overlayUV = rawUV * _overlayTranslationAndScale_0.zw + _overlayTranslationAndScale_0.xy;
                 if (_FlipOverlayV > 0.5)
-                {
                     overlayUV.y = 1.0 - overlayUV.y;
-                }
                 output.overlayUV = overlayUV;
+
+                // Geographic UV for the global province ID texture:
+                // world pos → ECEF direction → lat/lon → equirectangular UV
+                output.positionWS = TransformObjectToWorld(input.positionOS);
+
                 return output;
             }
 
             float4 frag(Varyings input) : SV_Target
             {
+                // Landcover color from overlay
                 float2 snappedOverlayUV = SnapUVToTexelCenter(input.overlayUV, _overlayTexture_0_TexelSize);
                 float4 overlaySample = SAMPLE_TEXTURE2D_LOD(_overlayTexture_0, sampler_overlayTexture_0, snappedOverlayUV, 0);
-
                 float idx = DecodeLandcoverIndex(overlaySample.r);
                 float lutU = (idx + 0.5) / 256.0;
                 float3 classColor = SAMPLE_TEXTURE2D(_LandcoverLUT, sampler_LandcoverLUT, float2(lutU, 0.5)).rgb;
-                return float4(classColor, 1.0);
+
+                // Province selection — force mip 0 because provinceUV derives from
+                // world position, giving wrong screen-space derivatives for auto-mip.
+                float3 ecefPos = _CesiumGlobeCenterEcef.xyz +
+                                 mul((float3x3)_CesiumWorldDirToEcef,
+                                     input.positionWS - _CesiumGlobeCenterWorld.xyz);
+                float lon = atan2(ecefPos.y, ecefPos.x);
+                float3 geodeticNormal = normalize(ecefPos * _CesiumOneOverRadiiSquared.xyz);
+                float lat = asin(clamp(geodeticNormal.z, -1.0, 1.0));
+                float2 provinceUV = float2(lon / TWO_PI_ + 0.5, lat / PI_ + 0.5);
+                float4 provinceSample = SAMPLE_TEXTURE2D_LOD(_ProvinceIDTex, sampler_ProvinceIDTex, provinceUV, 0);
+                float3 outColor = ApplyProvinceHoverSelect(provinceSample.rgb, classColor);
+
+                // DEBUG: uncomment one of these to diagnose province selection issues:
+                // return float4(provinceUV, 0.0, 1.0);  // UV mapping (should look like a world map)
+                // return float4(provinceSample.rgb, 1.0);       // raw province IDs (colored regions)
+
+                return float4(outColor, 1.0);
             }
             ENDHLSL
         }
