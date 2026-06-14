@@ -14,7 +14,7 @@ Material:
   m_ValidKeywords: []
   m_InvalidKeywords:
   - _FLIPOVERLAYV_ON
-  - _OVERLAYINDEXEDSRGB_ON
+  - _USELANDCOVERTEXTURES_ON
   - _USEOVERLAYALPHA_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -51,8 +51,16 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _GrasslandTextureVariants:
+        m_Texture: {fileID: 18700000, guid: 2348c84b05b0f414eb69aee5698b062d, type: 2}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _LandcoverLUT:
-        m_Texture: {fileID: 2800000, guid: 234b5f7b02468fe44aa9e9ff2666742d, type: 3}
+        m_Texture: {fileID: 2800000, guid: cb9a8d2f730fd214c90a73515a49055e, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _LandcoverTextureArray:
+        m_Texture: {fileID: 18700000, guid: f850b279bb7aa5e428db016f9ae3f2f2, type: 2}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
@@ -120,10 +128,11 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
+    - _GrasslandVariantCount: 4
     - _HoverID: -1
     - _Metallic: 0
     - _OcclusionStrength: 1
-    - _OverlayIndexedSRGB: 1
+    - _OverlayGeoRectValid_0: 0
     - _Parallax: 0.005
     - _QueueOffset: 0
     - _ReceiveShadows: 1
@@ -134,6 +143,7 @@ Material:
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Surface: 0
+    - _UseLandcoverTextures: 1
     - _UseOverlayAlpha: 1
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
@@ -147,6 +157,7 @@ Material:
     - _FallbackColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _HighlightColor: {r: 1, g: 0.7490196, b: 0, a: 0}
     - _HoverColor: {r: 0, g: 1, b: 1, a: 0}
+    - _OverlayGeoUvScaleOffset_0: {r: 1, g: 1, b: 0, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _overlayTranslationAndScale_0: {r: 0, g: 0, b: 1, a: 1}
     - _overlayTranslationAndScale_1: {r: 0, g: 0, b: 1, a: 1}

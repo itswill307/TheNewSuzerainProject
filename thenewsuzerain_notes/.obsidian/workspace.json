@@ -4,31 +4,25 @@
     "type": "split",
     "children": [
       {
-        "id": "76352d5b9862a54f",
-        "type": "tabs",
-        "children": [
-          {
-            "id": "0586d11b95445dc1",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Countries/Americas/United States of America.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "United States of America"
-            }
-          }
-        ]
-      },
-      {
         "id": "58d5986acbbfe75b",
         "type": "tabs",
         "children": [
           {
             "id": "7b29f4ab74db85bf",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Countries/Asia/Indonesia.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Indonesia"
+            }
+          },
+          {
+            "id": "bb3fc36b154ae347",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -37,7 +31,8 @@
               "title": "Graph view"
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -197,22 +192,27 @@
       "obsidian-excalidraw-plugin:New drawing": false
     }
   },
-  "active": "7b29f4ab74db85bf",
+  "active": "bb3fc36b154ae347",
   "lastOpenFiles": [
+    "Game/Gameplay.md",
+    "Game/Plan.md",
+    "Game/Story.md",
+    "Game/UI Mockup.md",
+    "Game/Divergences.md",
+    "Game/Choices.md",
+    "Countries/Asia/Indonesia.md",
+    "Countries/Asia/Southeast Asia.md",
     "Countries/Americas/United States of America.md",
     "Countries/Asia/Korea.md",
     "Countries/Europe/Reichskommissariat Kaukasien.md",
     "Countries/Europe/Russia.md",
     "Countries/Europe/Germany.md",
-    "Game/Plan.md",
-    "Game/Story.md",
     "Countries/Europe/Hungary.md",
     "German Reich Planned Borders.png",
     "Countries/Asia/Central Asia.md",
     "Reichskommissariat Kaukasien.md",
     "Nzgermanplans.png",
     "Countries/Europe/Mediterranean.md",
-    "Game/UI Mockup.md",
     "Game/UI_images/48US.svg",
     "Game/UI_images",
     "Game/UI_images/wt3map.png",
@@ -226,18 +226,14 @@
     "Untitled.canvas",
     "Countries/Asia/Japan.md",
     "Countries/Europe/Italy.md",
-    "Game/Divergences.md",
     "Game/Conflict Starters.md",
     "Countries/Europe/Balkans.md",
     "Game/Timeline.md",
     "Untitled.base",
     "Countries/Asia/India.md",
     "Countries/Africa/Middle East.md",
-    "Countries/Asia/Southeast Asia.md",
     "Countries/Asia/China.md",
     "Countries/Europe/Axis.md",
-    "Game/Gameplay.md",
-    "Game/Choices.md",
     "Countries/Americas",
     "Countries/Asia",
     "Countries/Africa",

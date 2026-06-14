@@ -5,10 +5,13 @@ Shader "GlobalMapShader"
         [Header(Textures)]
         _MainTex ("Base Color", 2D) = "white" {}
         _LandcoverLUT ("Landcover LUT (256x1)", 2D) = "white" {}
+        [NoScaleOffset] _LandcoverTextureArray ("Landcover Texture Array", 2DArray) = "" {}
+        [NoScaleOffset] _GrasslandTextureVariants ("Grassland Texture Variants", 2DArray) = "" {}
+        [HideInInspector] _GrasslandVariantCount ("Grassland Variant Count", Float) = 0
         _ProvinceIDTex ("Province ID Map", 2D) = "white" {}
         _HeightTex ("Height Map", 2D) = "black" {}
         [Toggle] _UseLandcoverLUT ("Use Landcover LUT", Float) = 0
-        [Toggle] _MainTexIndexedSRGB ("Indexed MainTex Is sRGB", Float) = 1
+        [Toggle] _UseLandcoverTextures ("Use Landcover Textures", Float) = 0
 
         [Header(Geometry)]
         _UVOffset ("UV Offset (X,Y)", Vector) = (0, 0, 0, 0)
@@ -21,13 +24,6 @@ Shader "GlobalMapShader"
         _HeightMaxKm ("Height Max (km)", Float) = 8.849
         _HeightExaggeration ("Height Exaggeration", Float) = 1
         _KmPerUnit ("Km Per Unit", Float) = 1
-
-        [Header(Local Patch Mask)]
-        [Toggle] _LocalPatchMaskEnable ("Mask Global Under Local Patch", Float) = 0
-        _LocalPatchCenterLonDeg ("Patch Center Longitude (deg)", Float) = 0
-        _LocalPatchCenterLatDeg ("Patch Center Latitude (deg)", Float) = 0
-        _LocalPatchSpanLonDeg ("Patch Width in Longitude (deg)", Float) = 20
-        _LocalPatchSpanLatDeg ("Patch Height in Latitude (deg)", Float) = 10
 
         [Header(Selection)]
         _SelectedID ("Selected ID", Float) = -1
@@ -56,7 +52,7 @@ Shader "GlobalMapShader"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #pragma target 3.0
+            #pragma target 3.5
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -66,7 +62,10 @@ Shader "GlobalMapShader"
 
             TEXTURE2D(_LandcoverLUT);
             SAMPLER(sampler_LandcoverLUT);
-
+            TEXTURE2D_ARRAY(_LandcoverTextureArray);
+            SAMPLER(sampler_LandcoverTextureArray);
+            TEXTURE2D_ARRAY(_GrasslandTextureVariants);
+            SAMPLER(sampler_GrasslandTextureVariants);
             TEXTURE2D(_ProvinceIDTex);
             SAMPLER(sampler_ProvinceIDTex);
 
@@ -87,18 +86,17 @@ Shader "GlobalMapShader"
                 float _SelectedID;
                 float _HoverID;
                 float _UseLandcoverLUT;
-                float _MainTexIndexedSRGB;
+                float _UseLandcoverTextures;
+                float _GrasslandVariantCount;
                 float _Sphere;
-                float _LocalPatchMaskEnable;
-                float _LocalPatchCenterLonDeg;
-                float _LocalPatchCenterLatDeg;
-                float _LocalPatchSpanLonDeg;
-                float _LocalPatchSpanLatDeg;
             CBUFFER_END
 
             static const float PI_ = 3.14159265359;
-            static const float TWO_PI_ = 6.28318530718;
             static const float COS_PHI1_ = 2.0 / PI_;
+            static const float LANDCOVER_METERS_PER_REPEAT = 100000.0;
+            static const float LANDCOVER_STOCHASTIC_CELL_REPEATS = 1.0;
+            static const float EARTH_EQUATORIAL_CIRCUMFERENCE_METERS = 40075016.686;
+            static const float EARTH_NORTH_SOUTH_METERS = 20037508.343;
 
             inline uint DecodeProvinceId24(float3 rgb)
             {
@@ -133,27 +131,135 @@ Shader "GlobalMapShader"
                 return color;
             }
 
-            float AngularDeltaLon(float lonA, float lonB)
+            float2 GetLandcoverTextureUV(float2 uv)
             {
-                float d = abs(frac((lonA - lonB) / TWO_PI_ + 0.5) - 0.5) * TWO_PI_;
-                return d;
+                float2 repeats = float2(
+                    EARTH_EQUATORIAL_CIRCUMFERENCE_METERS,
+                    EARTH_NORTH_SOUTH_METERS
+                ) / LANDCOVER_METERS_PER_REPEAT;
+                return float2(uv.x * repeats.x, uv.y * repeats.y);
+            }
+
+            float2 Hash22(float2 p)
+            {
+                float3 p3 = frac(float3(p.xyx) * float3(0.1031, 0.1030, 0.0973));
+                p3 += dot(p3, p3.yzx + 33.33);
+                return frac((p3.xx + p3.yz) * p3.zy);
+            }
+
+            float2 SkewLandcoverStochasticUV(float2 uv)
+            {
+                return float2(
+                    uv.x - uv.y * 0.57735026919,
+                    uv.y * 1.15470053838
+                );
+            }
+
+            float2 UnskewLandcoverStochasticCell(float2 cell)
+            {
+                return float2(
+                    cell.x + cell.y * 0.5,
+                    cell.y * 0.86602540378
+                ) * LANDCOVER_STOCHASTIC_CELL_REPEATS;
+            }
+
+            float2 TransformLandcoverUV(float2 tiledUV, float2 cell, float classId)
+            {
+                float2 seed = cell + float2(classId * 17.17, classId * 31.31);
+                float2 hash = Hash22(seed);
+                float2 cellOrigin = UnskewLandcoverStochasticCell(cell);
+                float2 cellCenter = LANDCOVER_STOCHASTIC_CELL_REPEATS * 0.5;
+                float2 uv = tiledUV - cellOrigin - cellCenter;
+                float transform = floor(hash.x * 8.0);
+
+                if (transform < 1.0) uv = uv;
+                else if (transform < 2.0) uv = float2(-uv.x, uv.y);
+                else if (transform < 3.0) uv = float2(uv.x, -uv.y);
+                else if (transform < 4.0) uv = -uv;
+                else if (transform < 5.0) uv = uv.yx;
+                else if (transform < 6.0) uv = float2(-uv.y, uv.x);
+                else if (transform < 7.0) uv = float2(uv.y, -uv.x);
+                else if (transform >= 7.0) uv = -uv.yx;
+
+                return uv + cellCenter + (hash - 0.5) * 128.0;
+            }
+
+            float GrasslandVariantIndex(float2 cell, float classId)
+            {
+                float variantCount = max(0.0, _GrasslandVariantCount);
+                float2 seed = cell + float2(classId * 41.41, classId * 59.59);
+                return clamp(floor(Hash22(seed).y * variantCount), 0.0, max(0.0, variantCount - 1.0));
+            }
+
+            float3 SampleLandcoverTextureRaw(float classId, float2 tiledUV, float2 cell)
+            {
+                if (abs(classId - 10.0) < 0.5 && _GrasslandVariantCount > 0.5)
+                {
+                    return SAMPLE_TEXTURE2D_ARRAY(
+                        _GrasslandTextureVariants,
+                        sampler_GrasslandTextureVariants,
+                        tiledUV,
+                        GrasslandVariantIndex(cell, classId)).rgb;
+                }
+
+                return SAMPLE_TEXTURE2D_ARRAY(_LandcoverTextureArray, sampler_LandcoverTextureArray, tiledUV, classId).rgb;
+            }
+
+            float3 SampleLandcoverTextureById(float landcoverId, float2 tiledUV)
+            {
+                float classId = clamp(round(landcoverId), 0.0, 17.0);
+
+                float2 stochasticUV = SkewLandcoverStochasticUV(tiledUV / LANDCOVER_STOCHASTIC_CELL_REPEATS);
+                float2 cell = floor(stochasticUV);
+                float2 f = frac(stochasticUV);
+                float3 bary = float3(f, 1.0 - f.x - f.y);
+
+                float2 cellA;
+                float2 cellB;
+                float2 cellC;
+                float3 weights;
+                if (bary.z > 0.0)
+                {
+                    cellA = cell;
+                    cellB = cell + float2(0.0, 1.0);
+                    cellC = cell + float2(1.0, 0.0);
+                    weights = float3(bary.z, bary.y, bary.x);
+                }
+                else
+                {
+                    cellA = cell + float2(1.0, 1.0);
+                    cellB = cell + float2(1.0, 0.0);
+                    cellC = cell + float2(0.0, 1.0);
+                    weights = float3(-bary.z, 1.0 - bary.y, 1.0 - bary.x);
+                }
+
+                weights /= max(1e-5, weights.x + weights.y + weights.z);
+
+                float3 a = SampleLandcoverTextureRaw(classId, TransformLandcoverUV(tiledUV, cellA, classId), cellA);
+                float3 b = SampleLandcoverTextureRaw(classId, TransformLandcoverUV(tiledUV, cellB, classId), cellB);
+                float3 c = SampleLandcoverTextureRaw(classId, TransformLandcoverUV(tiledUV, cellC, classId), cellC);
+                return a * weights.x + b * weights.y + c * weights.z;
             }
 
             float3 SampleBaseColor(float2 uv)
             {
                 float3 sampled = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv).rgb;
+                if (_UseLandcoverLUT <= 0.5 && _UseLandcoverTextures <= 0.5)
+                {
+                    return sampled;
+                }
+
+                float idx = round(saturate(sampled.r) * 255.0);
+                if (_UseLandcoverTextures > 0.5 && idx <= 17.5)
+                {
+                    return SampleLandcoverTextureById(idx, GetLandcoverTextureUV(uv));
+                }
+
                 if (_UseLandcoverLUT <= 0.5)
                 {
                     return sampled;
                 }
 
-                float idx01 = saturate(sampled.r);
-                if (_MainTexIndexedSRGB > 0.5)
-                {
-                    idx01 = LinearToSRGB(float3(idx01, idx01, idx01)).r;
-                }
-
-                float idx = round(saturate(idx01) * 255.0);
                 float lutU = (idx + 0.5) / 256.0;
                 return SAMPLE_TEXTURE2D(_LandcoverLUT, sampler_LandcoverLUT, float2(lutU, 0.5)).rgb;
             }
@@ -375,23 +481,6 @@ Shader "GlobalMapShader"
                 UNITY_SETUP_INSTANCE_ID(input);
 
                 float sphereLerp = saturate(_Sphere);
-                if (sphereLerp > 0.5 && _LocalPatchMaskEnable > 0.5)
-                {
-                    float longitude = (input.uv.x - 0.5) * TWO_PI_;
-                    float latitude = (saturate(input.uv.y) - 0.5) * PI_;
-                    float centerLon = _LocalPatchCenterLonDeg * (PI_ / 180.0);
-                    float centerLat = _LocalPatchCenterLatDeg * (PI_ / 180.0);
-                    float halfSpanLon = max(1e-6, abs(_LocalPatchSpanLonDeg)) * (PI_ / 360.0);
-                    float halfSpanLat = max(1e-6, abs(_LocalPatchSpanLatDeg)) * (PI_ / 360.0);
-
-                    float dLon = AngularDeltaLon(longitude, centerLon);
-                    float dLat = abs(latitude - centerLat);
-                    float insideLon = step(dLon, halfSpanLon);
-                    float insideLat = step(dLat, halfSpanLat);
-                    float insidePatch = insideLon * insideLat;
-                    clip(0.5 - insidePatch); // discard global map where local patch should render
-                }
-
                 float2 planarUV = input.uv + _UVOffset;
                 float2 sphereUV = float2(
                     input.uv.x,

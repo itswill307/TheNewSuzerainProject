@@ -14,6 +14,7 @@ Material:
   m_ValidKeywords: []
   m_InvalidKeywords:
   - _USELANDCOVERLUT_ON
+  - _USELANDCOVERTEXTURES_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -49,12 +50,20 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _GrasslandTextureVariants:
+        m_Texture: {fileID: 18700000, guid: 2348c84b05b0f414eb69aee5698b062d, type: 2}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _HeightTex:
         m_Texture: {fileID: 2800000, guid: 24f39361c1eed4ef9b4e32a95ad3b444, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _LandcoverLUT:
-        m_Texture: {fileID: 2800000, guid: 234b5f7b02468fe44aa9e9ff2666742d, type: 3}
+        m_Texture: {fileID: 2800000, guid: cb9a8d2f730fd214c90a73515a49055e, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _LandcoverTextureArray:
+        m_Texture: {fileID: 18700000, guid: f850b279bb7aa5e428db016f9ae3f2f2, type: 2}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _LeftTex:
@@ -124,19 +133,14 @@ Material:
     - _Glossiness: 0
     - _GlossinessSource: 0
     - _GlossyReflections: 0
+    - _GrasslandVariantCount: 4
     - _HeightBias: 0
     - _HeightExaggeration: 0
     - _HeightMaxKm: 8.849
     - _HeightMinKm: -10.994
     - _HeightScale: 0
-    - _HoverID: -1
+    - _HoverID: 3455
     - _KmPerUnit: 1
-    - _LocalPatchCenterLatDeg: 27.855246
-    - _LocalPatchCenterLonDeg: 82.53027
-    - _LocalPatchMaskEnable: 0
-    - _LocalPatchSpanLatDeg: 1.7986407
-    - _LocalPatchSpanLonDeg: 4.0687203
-    - _MainTexIndexedSRGB: 0
     - _Metallic: 0
     - _MinBrightness: 0.25
     - _Mode: 0
@@ -160,6 +164,7 @@ Material:
     - _Surface: 0
     - _UVSec: 0
     - _UseLandcoverLUT: 1
+    - _UseLandcoverTextures: 1
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
