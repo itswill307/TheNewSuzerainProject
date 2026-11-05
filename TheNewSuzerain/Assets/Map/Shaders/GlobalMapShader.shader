@@ -13,6 +13,19 @@ Shader "GlobalMapShader"
         [Toggle] _UseLandcoverLUT ("Use Landcover LUT", Float) = 0
         [Toggle] _UseLandcoverTextures ("Use Landcover Textures", Float) = 0
 
+        [Header(Natural Terrain)]
+        [NoScaleOffset] _TerrainSurfaceTex ("Terrain-Derived Distant Surface", 2D) = "white" {}
+        [NoScaleOffset] _TerrainElevationTex ("Relief Elevation", 2D) = "black" {}
+        [Toggle] _UseNaturalTerrain ("Use Natural Terrain", Float) = 1
+        _TerrainDetailMeters ("Detail Base Span (meters)", Float) = 2048
+        [Range(0, 1)] _TerrainDetailStrength ("Detail Strength", Float) = 0.75
+        [Range(0, 1)] _TerrainBoundaryBlend ("Terrain Boundary Blend", Float) = 1
+        [Range(0, 1)] _TerrainVegetationEdges ("Vegetation Edge Patches", Float) = 0.8
+        [Range(0, 1)] _TerrainShorelineDetail ("Shoreline Irregularity", Float) = 0.8
+        [Range(0, 1)] _TerrainReliefStrength ("Elevation Relief Strength", Float) = 0.35
+        [HideInInspector] _TerrainElevationRangeMeters ("Elevation Range (meters)", Float) = 19843
+        _TerrainDetailFadeStart ("Close Detail Reference (meters per pixel)", Float) = 15
+
         [Header(Geometry)]
         _UVOffset ("UV Offset (X,Y)", Vector) = (0, 0, 0, 0)
         _Radius ("World Radius", Float) = 100
@@ -59,6 +72,7 @@ Shader "GlobalMapShader"
 
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
+            float4 _MainTex_TexelSize;
 
             TEXTURE2D(_LandcoverLUT);
             SAMPLER(sampler_LandcoverLUT);
@@ -89,14 +103,19 @@ Shader "GlobalMapShader"
                 float _UseLandcoverTextures;
                 float _GrasslandVariantCount;
                 float _Sphere;
+                float _UseNaturalTerrain;
+                float _TerrainDetailMeters;
+                float _TerrainDetailStrength;
+                float _TerrainBoundaryBlend;
+                float _TerrainVegetationEdges;
+                float _TerrainShorelineDetail;
+                float _TerrainReliefStrength;
+                float _TerrainElevationRangeMeters;
+                float _TerrainDetailFadeStart;
             CBUFFER_END
 
             static const float PI_ = 3.14159265359;
             static const float COS_PHI1_ = 2.0 / PI_;
-            static const float LANDCOVER_METERS_PER_REPEAT = 100000.0;
-            static const float LANDCOVER_STOCHASTIC_CELL_REPEATS = 1.0;
-            static const float EARTH_EQUATORIAL_CIRCUMFERENCE_METERS = 40075016.686;
-            static const float EARTH_NORTH_SOUTH_METERS = 20037508.343;
 
             inline uint DecodeProvinceId24(float3 rgb)
             {
@@ -131,119 +150,13 @@ Shader "GlobalMapShader"
                 return color;
             }
 
-            float2 GetLandcoverTextureUV(float2 uv)
-            {
-                float2 repeats = float2(
-                    EARTH_EQUATORIAL_CIRCUMFERENCE_METERS,
-                    EARTH_NORTH_SOUTH_METERS
-                ) / LANDCOVER_METERS_PER_REPEAT;
-                return float2(uv.x * repeats.x, uv.y * repeats.y);
-            }
-
-            float2 Hash22(float2 p)
-            {
-                float3 p3 = frac(float3(p.xyx) * float3(0.1031, 0.1030, 0.0973));
-                p3 += dot(p3, p3.yzx + 33.33);
-                return frac((p3.xx + p3.yz) * p3.zy);
-            }
-
-            float2 SkewLandcoverStochasticUV(float2 uv)
-            {
-                return float2(
-                    uv.x - uv.y * 0.57735026919,
-                    uv.y * 1.15470053838
-                );
-            }
-
-            float2 UnskewLandcoverStochasticCell(float2 cell)
-            {
-                return float2(
-                    cell.x + cell.y * 0.5,
-                    cell.y * 0.86602540378
-                ) * LANDCOVER_STOCHASTIC_CELL_REPEATS;
-            }
-
-            float2 TransformLandcoverUV(float2 tiledUV, float2 cell, float classId)
-            {
-                float2 seed = cell + float2(classId * 17.17, classId * 31.31);
-                float2 hash = Hash22(seed);
-                float2 cellOrigin = UnskewLandcoverStochasticCell(cell);
-                float2 cellCenter = LANDCOVER_STOCHASTIC_CELL_REPEATS * 0.5;
-                float2 uv = tiledUV - cellOrigin - cellCenter;
-                float transform = floor(hash.x * 8.0);
-
-                if (transform < 1.0) uv = uv;
-                else if (transform < 2.0) uv = float2(-uv.x, uv.y);
-                else if (transform < 3.0) uv = float2(uv.x, -uv.y);
-                else if (transform < 4.0) uv = -uv;
-                else if (transform < 5.0) uv = uv.yx;
-                else if (transform < 6.0) uv = float2(-uv.y, uv.x);
-                else if (transform < 7.0) uv = float2(uv.y, -uv.x);
-                else if (transform >= 7.0) uv = -uv.yx;
-
-                return uv + cellCenter + (hash - 0.5) * 128.0;
-            }
-
-            float GrasslandVariantIndex(float2 cell, float classId)
-            {
-                float variantCount = max(0.0, _GrasslandVariantCount);
-                float2 seed = cell + float2(classId * 41.41, classId * 59.59);
-                return clamp(floor(Hash22(seed).y * variantCount), 0.0, max(0.0, variantCount - 1.0));
-            }
-
-            float3 SampleLandcoverTextureRaw(float classId, float2 tiledUV, float2 cell)
-            {
-                if (abs(classId - 10.0) < 0.5 && _GrasslandVariantCount > 0.5)
-                {
-                    return SAMPLE_TEXTURE2D_ARRAY(
-                        _GrasslandTextureVariants,
-                        sampler_GrasslandTextureVariants,
-                        tiledUV,
-                        GrasslandVariantIndex(cell, classId)).rgb;
-                }
-
-                return SAMPLE_TEXTURE2D_ARRAY(_LandcoverTextureArray, sampler_LandcoverTextureArray, tiledUV, classId).rgb;
-            }
-
-            float3 SampleLandcoverTextureById(float landcoverId, float2 tiledUV)
-            {
-                float classId = clamp(round(landcoverId), 0.0, 17.0);
-
-                float2 stochasticUV = SkewLandcoverStochasticUV(tiledUV / LANDCOVER_STOCHASTIC_CELL_REPEATS);
-                float2 cell = floor(stochasticUV);
-                float2 f = frac(stochasticUV);
-                float3 bary = float3(f, 1.0 - f.x - f.y);
-
-                float2 cellA;
-                float2 cellB;
-                float2 cellC;
-                float3 weights;
-                if (bary.z > 0.0)
-                {
-                    cellA = cell;
-                    cellB = cell + float2(0.0, 1.0);
-                    cellC = cell + float2(1.0, 0.0);
-                    weights = float3(bary.z, bary.y, bary.x);
-                }
-                else
-                {
-                    cellA = cell + float2(1.0, 1.0);
-                    cellB = cell + float2(1.0, 0.0);
-                    cellC = cell + float2(0.0, 1.0);
-                    weights = float3(-bary.z, 1.0 - bary.y, 1.0 - bary.x);
-                }
-
-                weights /= max(1e-5, weights.x + weights.y + weights.z);
-
-                float3 a = SampleLandcoverTextureRaw(classId, TransformLandcoverUV(tiledUV, cellA, classId), cellA);
-                float3 b = SampleLandcoverTextureRaw(classId, TransformLandcoverUV(tiledUV, cellB, classId), cellB);
-                float3 c = SampleLandcoverTextureRaw(classId, TransformLandcoverUV(tiledUV, cellC, classId), cellC);
-                return a * weights.x + b * weights.y + c * weights.z;
-            }
+            #include "NaturalTerrain.hlsl"
 
             float3 SampleBaseColor(float2 uv)
             {
-                float3 sampled = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv).rgb;
+                float3 distant;
+                if (_UseLandcoverTextures > 0.5 && TerrainDistantColor(uv, distant)) return distant;
+                float3 sampled = SAMPLE_TEXTURE2D_LOD(_MainTex, sampler_MainTex, uv, 0).rgb;
                 if (_UseLandcoverLUT <= 0.5 && _UseLandcoverTextures <= 0.5)
                 {
                     return sampled;
@@ -252,7 +165,21 @@ Shader "GlobalMapShader"
                 float idx = round(saturate(sampled.r) * 255.0);
                 if (_UseLandcoverTextures > 0.5 && idx <= 17.5)
                 {
-                    return SampleLandcoverTextureById(idx, GetLandcoverTextureUV(uv));
+                    [branch] if (TerrainShouldBlendClasses(uv))
+                    {
+                        float2 size = max(_MainTex_TexelSize.zw, 1.0);
+                        float2 pixel = uv * size - 0.5;
+                        float2 origin = (floor(pixel) + 0.5) / size;
+                        // Sample categorical IDs at texel centers, then blend
+                        // their rendered surfaces. Never interpolate ID numbers.
+                        float4 ids = round(saturate(float4(
+                            SAMPLE_TEXTURE2D_LOD(_MainTex, sampler_MainTex, origin, 0).r,
+                            SAMPLE_TEXTURE2D_LOD(_MainTex, sampler_MainTex, origin + float2(1,0)/size, 0).r,
+                            SAMPLE_TEXTURE2D_LOD(_MainTex, sampler_MainTex, origin + float2(0,1)/size, 0).r,
+                            SAMPLE_TEXTURE2D_LOD(_MainTex, sampler_MainTex, origin + 1.0/size, 0).r)) * 255.0);
+                        return ResolveTerrainNeighborhood(idx, ids, frac(pixel), uv, 1.0/size);
+                    }
+                    return ResolveNaturalTerrain(idx, uv);
                 }
 
                 if (_UseLandcoverLUT <= 0.5)

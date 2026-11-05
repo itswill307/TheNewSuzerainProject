@@ -11,10 +11,12 @@
             "id": "7b29f4ab74db85bf",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
-              "icon": "lucide-file",
-              "title": "New tab"
+              "type": "excalidraw",
+              "state": {
+                "file": "Game/UI Mockup.md"
+              },
+              "icon": "excalidraw-icon",
+              "title": "UI Mockup"
             }
           }
         ]
@@ -37,9 +39,7 @@
               "type": "file-explorer",
               "state": {
                 "sortOrder": "alphabetical",
-                "autoReveal": false,
-                "showSearch": false,
-                "searchQuery": ""
+                "autoReveal": false
               },
               "icon": "lucide-folder-closed",
               "title": "Files"
@@ -110,11 +110,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
+                "file": "Game/UI Mockup.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links"
+              "title": "Outgoing links from UI Mockup"
             }
           },
           {
@@ -179,7 +180,7 @@
       "obsidian-excalidraw-plugin:New drawing": false
     }
   },
-  "active": "8bce67551693115f",
+  "active": "7b29f4ab74db85bf",
   "lastOpenFiles": [
     "Europe/Russia.md",
     "Europe/Reichskommissariat Kaukasien.md",

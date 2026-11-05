@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -23,8 +22,8 @@ public static class LandcoverTextureArrayGenerator
         "Assets/Map/Textures/modis_lc_type1_09_savannas.png",
         "Assets/Map/Textures/modis_lc_type1_10_grasslands.png",
         "Assets/Map/Textures/modis_lc_type1_11_permanent_wetlands.png",
-        "Assets/Map/Textures/modis_lc_type1_12_croplands.png",
-        "Assets/Map/Textures/modis_lc_type1_13_urban_and_built_up.png",
+        "Assets/Map/Textures/natural_croplands_v2.png",
+        "Assets/Map/Textures/natural_urban_v2.png",
         "Assets/Map/Textures/modis_lc_type1_14_cropland_natural_vegetation_mosaic.png",
         "Assets/Map/Textures/modis_lc_type1_15_snow_and_ice.png",
         "Assets/Map/Textures/modis_lc_type1_16_barren_or_sparsely_vegetated.png",
@@ -45,186 +44,146 @@ public static class LandcoverTextureArrayGenerator
         "Assets/Map/Materials/CesiumCustomTerrain.mat",
     };
 
-    struct ImportSettings
-    {
-        public TextureImporter Importer;
-        public bool IsReadable;
-        public bool MipmapEnabled;
-        public bool SRgbTexture;
-        public TextureImporterCompression TextureCompression;
-    }
 
     [MenuItem("Tools/Map/Generate MODIS Landcover Texture2DArray")]
     public static void Generate()
     {
-        var importSettings = new List<ImportSettings>(SourceTexturePaths.Length + GrasslandVariantTexturePaths.Length);
+        // Decode the PNGs directly: importer caps/compression must not discard source detail
+        // before the array is built. Source import settings are never changed.
+        Texture2DArray landcover = BuildTextureArray(SourceTexturePaths, "modis_lc_type1_texture_array");
+        Texture2DArray variants = null;
         try
         {
-            Texture2D[] sources = LoadReadableSources(SourceTexturePaths, importSettings);
-            Texture2DArray textureArray = BuildTextureArray(sources, "modis_lc_type1_texture_array");
-            SaveTextureArray(textureArray, LandcoverOutputPath);
-
-            Texture2D[] grasslandVariantSources = LoadReadableSources(GrasslandVariantTexturePaths, importSettings);
-            Texture2DArray grasslandVariantArray = BuildTextureArray(grasslandVariantSources, "modis_lc_type1_10_grasslands_variants");
-            SaveTextureArray(grasslandVariantArray, GrasslandVariantsOutputPath);
-
-            Texture2DArray savedArray = AssetDatabase.LoadAssetAtPath<Texture2DArray>(LandcoverOutputPath);
-            Texture2DArray savedGrasslandVariants = AssetDatabase.LoadAssetAtPath<Texture2DArray>(GrasslandVariantsOutputPath);
-            AssignToMaterials(
-                savedArray != null ? savedArray : textureArray,
-                savedGrasslandVariants != null ? savedGrasslandVariants : grasslandVariantArray,
-                GrasslandVariantTexturePaths.Length);
-
-            Debug.Log($"Generated {TargetTextureSize}x{TargetTextureSize} landcover Texture2DArray with {SourceTexturePaths.Length} slices at {LandcoverOutputPath}.");
-            Debug.Log($"Generated {TargetTextureSize}x{TargetTextureSize} grassland variant Texture2DArray with {GrasslandVariantTexturePaths.Length} slices at {GrasslandVariantsOutputPath}.");
+            variants = BuildTextureArray(GrasslandVariantTexturePaths, "modis_lc_type1_10_grasslands_variants");
+            SaveTextureArray(landcover, LandcoverOutputPath);
+            SaveTextureArray(variants, GrasslandVariantsOutputPath);
+            AssignToMaterials();
+            TerrainSurfaceMapGenerator.Generate();
+            Debug.Log("Natural terrain: generated full-source 1024px BC7 arrays with mipmaps and no CPU copies. " +
+                "22 slices use approximately 29.3 MiB of GPU texture data (previously 117.3 MiB RGBA32).");
         }
         finally
         {
-            RestoreImportSettings(importSettings);
+            if (landcover != null && !AssetDatabase.Contains(landcover)) Object.DestroyImmediate(landcover);
+            if (variants != null && !AssetDatabase.Contains(variants)) Object.DestroyImmediate(variants);
         }
     }
 
-    static Texture2D[] LoadReadableSources(string[] texturePaths, List<ImportSettings> importSettings)
+    static Texture2DArray BuildTextureArray(string[] paths, string name)
     {
-        var sources = new Texture2D[texturePaths.Length];
-        for (int i = 0; i < texturePaths.Length; i++)
+        var array = new Texture2DArray(TargetTextureSize, TargetTextureSize, paths.Length, TextureFormat.BC7, true, false)
         {
-            string path = texturePaths[i];
-            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
-            if (importer == null)
-                throw new FileNotFoundException($"Could not find landcover source texture importer: {path}");
-
-            importSettings.Add(new ImportSettings
-            {
-                Importer = importer,
-                IsReadable = importer.isReadable,
-                MipmapEnabled = importer.mipmapEnabled,
-                SRgbTexture = importer.sRGBTexture,
-                TextureCompression = importer.textureCompression,
-            });
-
-            importer.isReadable = true;
-            importer.mipmapEnabled = true;
-            importer.sRGBTexture = true;
-            importer.textureCompression = TextureImporterCompression.Uncompressed;
-            importer.SaveAndReimport();
-
-            Texture2D source = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-            if (source == null)
-                throw new FileNotFoundException($"Could not load landcover source texture: {path}");
-
-            sources[i] = source;
-        }
-
-        return sources;
-    }
-
-    static Texture2DArray BuildTextureArray(Texture2D[] sources, string textureArrayName)
-    {
-        int width = TargetTextureSize;
-        int height = TargetTextureSize;
-        var textureArray = new Texture2DArray(width, height, sources.Length, TextureFormat.RGBA32, true, false)
-        {
-            name = textureArrayName,
+            name = name,
             wrapMode = TextureWrapMode.Repeat,
             filterMode = FilterMode.Trilinear,
             anisoLevel = 8,
         };
-
-        for (int slice = 0; slice < sources.Length; slice++)
-        {
-            Texture2D source = sources[slice];
-            Texture2D resized = source.width == width && source.height == height
-                ? source
-                : ResizeSource(source, width, height);
-
-            textureArray.SetPixels32(resized.GetPixels32(), slice, 0);
-
-            if (resized != source)
-            {
-                Object.DestroyImmediate(resized);
-            }
-        }
-
-        textureArray.Apply(true, false);
-        return textureArray;
-    }
-
-    static void SaveTextureArray(Texture2DArray textureArray, string outputPath)
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
-        AssetDatabase.DeleteAsset(outputPath);
-        AssetDatabase.CreateAsset(textureArray, outputPath);
-        AssetDatabase.SaveAssets();
-        AssetDatabase.ImportAsset(outputPath, ImportAssetOptions.ForceUpdate);
-    }
-
-    static Texture2D ResizeSource(Texture2D source, int width, int height)
-    {
-        RenderTexture previousActive = RenderTexture.active;
-        RenderTexture renderTexture = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
-
         try
         {
-            Graphics.Blit(source, renderTexture);
-            RenderTexture.active = renderTexture;
+            for (int slice = 0; slice < paths.Length; slice++)
+            {
+                var source = new Texture2D(2, 2, TextureFormat.RGBA32, true, false);
+                Texture2D resized = null;
+                try
+                {
+                    if (!ImageConversion.LoadImage(source, File.ReadAllBytes(paths[slice]), false))
+                        throw new IOException($"Unable to decode terrain texture {paths[slice]}");
+                    resized = source.width == TargetTextureSize && source.height == TargetTextureSize
+                        ? source : ResizeSource(source);
+                    resized.Apply(true, false);
+                    EditorUtility.CompressTexture(resized, TextureFormat.BC7, TextureCompressionQuality.Normal);
+                    if (resized.format != TextureFormat.BC7 || resized.mipmapCount != array.mipmapCount)
+                        throw new IOException($"Invalid compressed mip chain for {paths[slice]}");
+                    for (int mip = 0; mip < array.mipmapCount; mip++)
+                        array.SetPixelData(resized.GetPixelData<byte>(mip), mip, slice);
+                }
+                finally
+                {
+                    if (resized != null && resized != source) Object.DestroyImmediate(resized);
+                    Object.DestroyImmediate(source);
+                }
+            }
+            // Mips are already compressed. Do not regenerate them or retain a CPU copy.
+            array.Apply(false, true);
+            return array;
+        }
+        catch
+        {
+            Object.DestroyImmediate(array);
+            throw;
+        }
+    }
 
-            var resized = new Texture2D(width, height, TextureFormat.RGBA32, false, false);
-            resized.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-            resized.Apply(false, false);
+    static Texture2D ResizeSource(Texture2D source)
+    {
+        RenderTexture previous = RenderTexture.active;
+        RenderTexture temporary = RenderTexture.GetTemporary(TargetTextureSize, TargetTextureSize, 0,
+            RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+        try
+        {
+            Graphics.Blit(source, temporary);
+            RenderTexture.active = temporary;
+            var resized = new Texture2D(TargetTextureSize, TargetTextureSize, TextureFormat.RGBA32, true, false);
+            resized.ReadPixels(new Rect(0, 0, TargetTextureSize, TargetTextureSize), 0, 0);
+            resized.Apply(true, false);
             return resized;
         }
         finally
         {
-            RenderTexture.active = previousActive;
-            RenderTexture.ReleaseTemporary(renderTexture);
+            RenderTexture.active = previous;
+            RenderTexture.ReleaseTemporary(temporary);
         }
     }
 
-    static void AssignToMaterials(Texture2DArray textureArray, Texture2DArray grasslandVariantArray, int grasslandVariantCount)
+    static void SaveTextureArray(Texture2DArray array, string path)
     {
-        if (textureArray == null)
-            return;
-
-        int textureArrayProp = Shader.PropertyToID("_LandcoverTextureArray");
-        int grasslandVariantArrayProp = Shader.PropertyToID("_GrasslandTextureVariants");
-        int grasslandVariantCountProp = Shader.PropertyToID("_GrasslandVariantCount");
-        foreach (string materialPath in MaterialPaths)
+        // Preserve the GUID: deleting assets would break scene and material references.
+        Texture2DArray existing = AssetDatabase.LoadAssetAtPath<Texture2DArray>(path);
+        if (existing == null)
+            AssetDatabase.CreateAsset(array, path);
+        else
         {
-            Material material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
-            if (material == null || !material.HasProperty(textureArrayProp))
-                continue;
-
-            material.SetTexture(textureArrayProp, textureArray);
-            if (grasslandVariantArray != null && material.HasProperty(grasslandVariantArrayProp))
-            {
-                material.SetTexture(grasslandVariantArrayProp, grasslandVariantArray);
-            }
-
-            if (material.HasProperty(grasslandVariantCountProp))
-            {
-                material.SetFloat(grasslandVariantCountProp, grasslandVariantArray != null ? grasslandVariantCount : 0);
-            }
-
-            EditorUtility.SetDirty(material);
+            EditorUtility.CopySerialized(array, existing);
+            EditorUtility.SetDirty(existing);
         }
-
         AssetDatabase.SaveAssets();
     }
 
-    static void RestoreImportSettings(List<ImportSettings> importSettings)
+    [MenuItem("Tools/Map/Apply Natural Terrain Desktop Settings")]
+    public static void ConfigureDesktop()
     {
-        for (int i = 0; i < importSettings.Count; i++)
-        {
-            ImportSettings settings = importSettings[i];
-            if (settings.Importer == null)
-                continue;
+        TerrainSurfaceMapGenerator.ConfigureImport();
+        AssignToMaterials();
+    }
 
-            settings.Importer.isReadable = settings.IsReadable;
-            settings.Importer.mipmapEnabled = settings.MipmapEnabled;
-            settings.Importer.sRGBTexture = settings.SRgbTexture;
-            settings.Importer.textureCompression = settings.TextureCompression;
-            settings.Importer.SaveAndReimport();
+    static void AssignToMaterials()
+    {
+        Texture2DArray landcover = AssetDatabase.LoadAssetAtPath<Texture2DArray>(LandcoverOutputPath);
+        Texture2DArray variants = AssetDatabase.LoadAssetAtPath<Texture2DArray>(GrasslandVariantsOutputPath);
+        Texture2D surface = AssetDatabase.LoadAssetAtPath<Texture2D>(TerrainSurfaceMapGenerator.OutputPath);
+        Material flat = AssetDatabase.LoadAssetAtPath<Material>(MaterialPaths[0]);
+        Texture elevation = flat.GetTexture("_HeightTex");
+        float elevationRange = (flat.GetFloat("_HeightMaxKm") - flat.GetFloat("_HeightMinKm")) * 1000f;
+        foreach (string path in MaterialPaths)
+        {
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null) throw new FileNotFoundException(path);
+            material.SetTexture("_LandcoverTextureArray", landcover);
+            material.SetTexture("_GrasslandTextureVariants", variants);
+            material.SetFloat("_GrasslandVariantCount", GrasslandVariantTexturePaths.Length);
+            material.SetTexture("_TerrainSurfaceTex", surface);
+            material.SetFloat("_UseNaturalTerrain", 1f);
+            material.SetFloat("_TerrainDetailMeters", 2048f);
+            material.SetFloat("_TerrainDetailStrength", 0.75f);
+            material.SetFloat("_TerrainBoundaryBlend", 1f);
+            material.SetTexture("_TerrainElevationTex", elevation);
+            material.SetFloat("_TerrainElevationRangeMeters", elevationRange);
+            material.SetFloat("_TerrainReliefStrength", 0.35f);
+            material.SetFloat("_TerrainVegetationEdges", 0.8f);
+            material.SetFloat("_TerrainShorelineDetail", 0.8f);
+            material.SetFloat("_TerrainDetailFadeStart", 15f);
+            EditorUtility.SetDirty(material);
         }
+        AssetDatabase.SaveAssets();
     }
 }

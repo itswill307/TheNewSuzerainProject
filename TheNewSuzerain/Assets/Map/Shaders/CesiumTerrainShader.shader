@@ -16,6 +16,19 @@ Shader "CesiumTerrainShader"
         [HideInInspector] _GrasslandVariantCount ("Grassland Variant Count", Float) = 0
         [Toggle] _UseLandcoverTextures ("Use Landcover Textures", Float) = 0
         [Toggle] _FlipOverlayV ("Flip Overlay V", Float) = 1
+        [Header(Natural Terrain)]
+        [NoScaleOffset] _TerrainSurfaceTex ("Terrain-Derived Distant Surface", 2D) = "white" {}
+        [NoScaleOffset] _TerrainElevationTex ("Relief Elevation", 2D) = "black" {}
+        [Toggle] _UseNaturalTerrain ("Use Natural Terrain", Float) = 1
+        _TerrainDetailMeters ("Detail Base Span (meters)", Float) = 2048
+        [Range(0, 1)] _TerrainDetailStrength ("Detail Strength", Float) = 0.75
+        [Range(0, 1)] _TerrainBoundaryBlend ("Terrain Boundary Blend", Float) = 1
+        [Range(0, 1)] _TerrainVegetationEdges ("Vegetation Edge Patches", Float) = 0.8
+        [Range(0, 1)] _TerrainShorelineDetail ("Shoreline Irregularity", Float) = 0.8
+        [Range(0, 1)] _TerrainReliefStrength ("Elevation Relief Strength", Float) = 0.35
+        [HideInInspector] _TerrainElevationRangeMeters ("Elevation Range (meters)", Float) = 19843
+        _TerrainDetailFadeStart ("Close Detail Reference (meters per pixel)", Float) = 15
+
         [Header(Selection)]
         _ProvinceIDTex ("Province ID Map", 2D) = "black" {}
     }
@@ -77,14 +90,19 @@ Shader "CesiumTerrainShader"
                 float _GrasslandVariantCount;
                 float _FlipOverlayV;
                 float _OverlayGeoRectValid_0;
+                float _UseNaturalTerrain;
+                float _TerrainDetailMeters;
+                float _TerrainDetailStrength;
+                float _TerrainBoundaryBlend;
+                float _TerrainVegetationEdges;
+                float _TerrainShorelineDetail;
+                float _TerrainReliefStrength;
+                float _TerrainElevationRangeMeters;
+                float _TerrainDetailFadeStart;
             CBUFFER_END
 
             static const float PI_ = 3.14159265359;
             static const float TWO_PI_ = 6.28318530718;
-            static const float LANDCOVER_METERS_PER_REPEAT = 100000.0;
-            static const float LANDCOVER_STOCHASTIC_CELL_REPEATS = 1.0;
-            static const float EARTH_EQUATORIAL_CIRCUMFERENCE_METERS = 40075016.686;
-            static const float EARTH_NORTH_SOUTH_METERS = 20037508.343;
 
             struct Attributes
             {
@@ -137,117 +155,9 @@ Shader "CesiumTerrainShader"
                 return overlayUV * _OverlayGeoUvScaleOffset_0.xy + _OverlayGeoUvScaleOffset_0.zw;
             }
 
-            float2 GetLandcoverTextureUV(float2 geographicUV)
-            {
-                float2 repeats = float2(
-                    EARTH_EQUATORIAL_CIRCUMFERENCE_METERS,
-                    EARTH_NORTH_SOUTH_METERS
-                ) / LANDCOVER_METERS_PER_REPEAT;
-                return float2(geographicUV.x * repeats.x, geographicUV.y * repeats.y);
-            }
+            #include "NaturalTerrain.hlsl"
 
-            float2 Hash22(float2 p)
-            {
-                float3 p3 = frac(float3(p.xyx) * float3(0.1031, 0.1030, 0.0973));
-                p3 += dot(p3, p3.yzx + 33.33);
-                return frac((p3.xx + p3.yz) * p3.zy);
-            }
-
-            float2 SkewLandcoverStochasticUV(float2 uv)
-            {
-                return float2(
-                    uv.x - uv.y * 0.57735026919,
-                    uv.y * 1.15470053838
-                );
-            }
-
-            float2 UnskewLandcoverStochasticCell(float2 cell)
-            {
-                return float2(
-                    cell.x + cell.y * 0.5,
-                    cell.y * 0.86602540378
-                ) * LANDCOVER_STOCHASTIC_CELL_REPEATS;
-            }
-
-            float2 TransformLandcoverUV(float2 tiledUV, float2 cell, float classId)
-            {
-                float2 seed = cell + float2(classId * 17.17, classId * 31.31);
-                float2 hash = Hash22(seed);
-                float2 cellOrigin = UnskewLandcoverStochasticCell(cell);
-                float2 cellCenter = LANDCOVER_STOCHASTIC_CELL_REPEATS * 0.5;
-                float2 uv = tiledUV - cellOrigin - cellCenter;
-                float transform = floor(hash.x * 8.0);
-
-                if (transform < 1.0) uv = uv;
-                else if (transform < 2.0) uv = float2(-uv.x, uv.y);
-                else if (transform < 3.0) uv = float2(uv.x, -uv.y);
-                else if (transform < 4.0) uv = -uv;
-                else if (transform < 5.0) uv = uv.yx;
-                else if (transform < 6.0) uv = float2(-uv.y, uv.x);
-                else if (transform < 7.0) uv = float2(uv.y, -uv.x);
-                else if (transform >= 7.0) uv = -uv.yx;
-
-                return uv + cellCenter + (hash - 0.5) * 128.0;
-            }
-
-            float GrasslandVariantIndex(float2 cell, float classId)
-            {
-                float variantCount = max(0.0, _GrasslandVariantCount);
-                float2 seed = cell + float2(classId * 41.41, classId * 59.59);
-                return clamp(floor(Hash22(seed).y * variantCount), 0.0, max(0.0, variantCount - 1.0));
-            }
-
-            float3 SampleLandcoverTextureRaw(float classId, float2 tiledUV, float2 cell)
-            {
-                if (abs(classId - 10.0) < 0.5 && _GrasslandVariantCount > 0.5)
-                {
-                    return SAMPLE_TEXTURE2D_ARRAY(
-                        _GrasslandTextureVariants,
-                        sampler_GrasslandTextureVariants,
-                        tiledUV,
-                        GrasslandVariantIndex(cell, classId)).rgb;
-                }
-
-                return SAMPLE_TEXTURE2D_ARRAY(_LandcoverTextureArray, sampler_LandcoverTextureArray, tiledUV, classId).rgb;
-            }
-
-            float3 SampleLandcoverTextureById(float landcoverId, float2 tiledUV)
-            {
-                float classId = clamp(round(landcoverId), 0.0, 17.0);
-
-                float2 stochasticUV = SkewLandcoverStochasticUV(tiledUV / LANDCOVER_STOCHASTIC_CELL_REPEATS);
-                float2 cell = floor(stochasticUV);
-                float2 f = frac(stochasticUV);
-                float3 bary = float3(f, 1.0 - f.x - f.y);
-
-                float2 cellA;
-                float2 cellB;
-                float2 cellC;
-                float3 weights;
-                if (bary.z > 0.0)
-                {
-                    cellA = cell;
-                    cellB = cell + float2(0.0, 1.0);
-                    cellC = cell + float2(1.0, 0.0);
-                    weights = float3(bary.z, bary.y, bary.x);
-                }
-                else
-                {
-                    cellA = cell + float2(1.0, 1.0);
-                    cellB = cell + float2(1.0, 0.0);
-                    cellC = cell + float2(0.0, 1.0);
-                    weights = float3(-bary.z, 1.0 - bary.y, 1.0 - bary.x);
-                }
-
-                weights /= max(1e-5, weights.x + weights.y + weights.z);
-
-                float3 a = SampleLandcoverTextureRaw(classId, TransformLandcoverUV(tiledUV, cellA, classId), cellA);
-                float3 b = SampleLandcoverTextureRaw(classId, TransformLandcoverUV(tiledUV, cellB, classId), cellB);
-                float3 c = SampleLandcoverTextureRaw(classId, TransformLandcoverUV(tiledUV, cellC, classId), cellC);
-                return a * weights.x + b * weights.y + c * weights.z;
-            }
-
-            float3 ResolveLandcoverColor(float landcoverId, float2 geographicUV)
+            float3 ResolveLandcoverColor(float landcoverId, float2 geographicUV, float2 overlayUV)
             {
                 float lutU = (landcoverId + 0.5) / 256.0;
                 float3 classColor = SAMPLE_TEXTURE2D(_LandcoverLUT, sampler_LandcoverLUT, float2(lutU, 0.5)).rgb;
@@ -256,7 +166,21 @@ Shader "CesiumTerrainShader"
                     return classColor;
                 }
 
-                return SampleLandcoverTextureById(landcoverId, GetLandcoverTextureUV(geographicUV));
+                [branch] if (TerrainShouldBlendClasses(geographicUV))
+                {
+                    float2 size = max(_overlayTexture_0_TexelSize.zw, 1.0);
+                    float2 pixel = overlayUV * size - 0.5;
+                    float2 origin = (floor(pixel) + 0.5) / size;
+                    float4 ids = float4(
+                        DecodeLandcoverIndex(SAMPLE_TEXTURE2D_LOD(_overlayTexture_0, sampler_overlayTexture_0, origin, 0).r),
+                        DecodeLandcoverIndex(SAMPLE_TEXTURE2D_LOD(_overlayTexture_0, sampler_overlayTexture_0, origin + float2(1,0)/size, 0).r),
+                        DecodeLandcoverIndex(SAMPLE_TEXTURE2D_LOD(_overlayTexture_0, sampler_overlayTexture_0, origin + float2(0,1)/size, 0).r),
+                        DecodeLandcoverIndex(SAMPLE_TEXTURE2D_LOD(_overlayTexture_0, sampler_overlayTexture_0, origin + 1.0/size, 0).r));
+                    float2 cellGeoSpan = _OverlayGeoRectValid_0 > 0.5
+                        ? abs(_OverlayGeoUvScaleOffset_0.xy)/size : float2(1,1)/size;
+                    return ResolveTerrainNeighborhood(landcoverId, ids, frac(pixel), geographicUV, cellGeoSpan);
+                }
+                return ResolveNaturalTerrain(landcoverId, geographicUV);
             }
 
             inline uint DecodeProvinceId24(float3 rgb)
@@ -325,7 +249,9 @@ Shader "CesiumTerrainShader"
                 float lat = asin(clamp(geodeticNormal.z, -1.0, 1.0));
                 float2 provinceUV = float2(lon / TWO_PI_ + 0.5, lat / PI_ + 0.5);
                 float2 landcoverDetailUV = _OverlayGeoRectValid_0 > 0.5 ? input.overlayGeoUV : provinceUV;
-                float3 classColor = ResolveLandcoverColor(idx, landcoverDetailUV);
+                float3 classColor;
+                if (_UseLandcoverTextures <= 0.5 || !TerrainDistantColor(landcoverDetailUV, classColor))
+                    classColor = ResolveLandcoverColor(idx, landcoverDetailUV, input.overlayUV);
                 float4 provinceSample = SAMPLE_TEXTURE2D_LOD(_ProvinceIDTex, sampler_ProvinceIDTex, provinceUV, 0);
                 float3 outColor = ApplyProvinceHoverSelect(provinceSample.rgb, classColor);
 
