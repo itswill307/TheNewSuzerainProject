@@ -148,7 +148,7 @@ Material:
     - _HeightMaxKm: 8.849
     - _HeightMinKm: -10.994
     - _HeightScale: 0
-    - _HoverID: -1
+    - _HoverID: 3279
     - _KmPerUnit: 1
     - _Metallic: 0
     - _MinBrightness: 0.25
