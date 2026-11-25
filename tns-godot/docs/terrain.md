@@ -851,8 +851,8 @@ The code is in `src/Map/Terrain/TerrainRenderer.cs` and `shaders/map/map_terrain
 ## 7. Rebuilding everything from scratch
 
 To just run the game on a new computer, there's no need to rebuild anything: the baked packs are
-attached to a GitHub release, and `tools/terrain/download_packs.ps1` downloads and unpacks them
-(see "Running" in the README). After a rebake, `make_pack_release.ps1` publishes the new packs the
+attached to a GitHub release, so download the zips from it and unzip them into `data/base` (see
+"Running" in the README). After a rebake, `make_pack_release.ps1` publishes the new packs the
 same way ("Sharing the baked packs" in `tools/terrain/README.md`).
 
 To rebuild the packs themselves on a new computer, from `tns-godot/tools/terrain`, with .NET 8 and

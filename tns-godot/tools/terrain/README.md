@@ -433,20 +433,15 @@ are read directly; for anything else, convert them first with
 The five baked packs (2.7 GB, over 250,000 files) are too big for git: GitHub refuses any file over
 100 MB, and every rebake would add another 2.7 GB to the history for good. So they're shared as
 files attached to a GitHub release, which sit outside the git history and can each be up to 2 GB.
-Both scripts below need the GitHub command-line tool (`winget install GitHub.cli`), signed in once
-with `gh auth login`.
-
-- **Getting them:** `download_packs.ps1` downloads the release named in `pack_release.txt`, unpacks
-  each pack into `data/base`, and checks that every file arrived by comparing the file count and
-  total size with the release's `packs.txt`. A pack that's already there is left alone unless you
-  add `-Replace`, which moves the old one aside to `<pack>-old` first. `-Tag terrain-2026-11-24`
-  picks a different release.
+- **Getting them:** on GitHub, open the newest `terrain-<date>` release, download the five zips and
+  unzip each into `data/base` (see "Running" in the game's README). The release's `packs.txt` lists
+  each pack's file count and size, to check against.
 - **Publishing them after a rebake:** `make_pack_release.ps1` zips each pack on its own into
   `terrain-sources/pack_release` (stored without compressing again, since the tiles already are;
   that's much quicker and only about 1% bigger), writes `packs.txt` listing each pack's file count
-  and size, creates a release tagged `terrain-<date>` with all of them attached, and writes the tag
-  into `pack_release.txt`. Commit that file, so the code and its data stay matched. `-ZipOnly`
-  makes the zips without uploading them.
+  and size, and creates a release tagged `terrain-<date>` with all of them attached. It needs the
+  GitHub command-line tool (`winget install GitHub.cli`), signed in once with `gh auth login`.
+  `-ZipOnly` makes the zips without uploading them, and `-ReuseZips` uploads zips made earlier.
 
 Each zip has to stay under 2 GB; the biggest, `terrain`, is about 1.2 GB.
 

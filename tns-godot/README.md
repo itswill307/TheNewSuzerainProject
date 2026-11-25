@@ -16,7 +16,6 @@ Windows only.
 | Running the game from the editor | F5 | Cmd+B |
 | Running Godot from a terminal | `godot` (or the full path to the `.exe`) | `/Applications/Godot_mono.app/Contents/MacOS/Godot` (or wherever you put the app) |
 | Graphics | Direct3D 12 | Metal, chosen automatically |
-| Getting the baked packs | `download_packs.ps1` (see "Running") | Download the five zips from the GitHub release page by hand and unzip them into `data/base` |
 | Baking terrain, making ground textures | The scripts in `tools/terrain` | Not done on a Mac |
 
 The game has nothing Windows-specific in its code, though it hasn't been tried on a Mac yet. The
@@ -26,20 +25,15 @@ VS Code, Obsidian and so on). The parts about baking are written for Windows.
 ## Running
 
 The baked terrain the map is drawn from (2.7 GB, over 250,000 files) isn't in git, because it's
-far too big. It's attached to a GitHub release instead. After cloning, download it once (on a Mac,
-see the table above):
+far too big. It's attached to a GitHub release instead. After cloning, get it once:
 
-1. Install the GitHub command-line tool (`winget install GitHub.cli`) and sign in to GitHub with it
-   (`gh auth login`). The download script uses it to fetch the release.
-2. From `tools/terrain`, run `download_packs.ps1`:
-
-   ```
-   powershell -ExecutionPolicy Bypass -File download_packs.ps1
-   ```
-
-   It downloads the release named in `tools/terrain/pack_release.txt`, unpacks the five packs into
-   `data/base` and checks that every file arrived. It takes a few minutes, depending on your
-   connection.
+1. On the repository's GitHub page, open **Releases** and pick the newest `terrain-<date>` release
+   (for example [terrain-2026-11-24](https://github.com/itswill307/TheNewSuzerainProject/releases/tag/terrain-2026-11-24)).
+2. Download its five zips: `terrain.zip`, `cover.zip`, `water.zip`, `surface.zip` and
+   `detail.zip` (2.7 GB in all).
+3. Unzip each one into `tns-godot/data/base`. Each zip holds its pack's folder, so you end up with
+   `data/base/terrain`, `data/base/cover` and so on. The release's `packs.txt` lists how many files
+   each pack should have, if you want to check nothing went missing.
 
 Then open the project in the Godot .NET editor and run it (F5 on Windows, Cmd+B on a Mac). Or,
 from this folder:

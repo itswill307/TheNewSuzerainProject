@@ -1,13 +1,10 @@
-# Puts the baked terrain packs on GitHub as a release, so a fresh clone of the repository can
-# download them (download_packs.ps1) instead of downloading 18 GB of raw data and baking for an
+# Puts the baked terrain packs on GitHub as a release, so after cloning the repository they can be
+# downloaded from the release page instead of downloading 18 GB of raw data and baking for an
 # hour.
 #
 # The packs are too big for git itself: over 250,000 tile files and 2.7 GB, and GitHub refuses any
 # file over 100 MB. A release holds files outside the git history, up to 2 GB each, free. So each
-# pack is zipped on its own (all are under 2 GB) and attached to a release tagged
-# terrain-<date>, and that tag is written to pack_release.txt next to this script, which
-# download_packs.ps1 reads. Commit pack_release.txt afterwards so the code and its data stay
-# matched.
+# pack is zipped on its own (all are under 2 GB) and attached to a release tagged terrain-<date>.
 #
 # The tiles are already compressed, so the zips are stored without compressing them again: much
 # faster, and only about 1% bigger.
@@ -41,7 +38,7 @@ $Data = (Resolve-Path $Data).Path
 New-Item -ItemType Directory -Force $Work | Out-Null
 $Work = (Resolve-Path $Work).Path
 
-# What is in each pack, so download_packs.ps1 can check nothing went missing on the way.
+# What is in each pack (file count and size), to check an unzipped pack against.
 $manifest = @("# Baked terrain packs in release $Tag (make_pack_release.ps1): pack, files, bytes")
 $zips = @()
 foreach ($pack in $Packs) {
@@ -74,7 +71,7 @@ if ($ZipOnly) { "zipped into $Work; not uploaded (-ZipOnly)"; return }
 
 $notes = @"
 Baked terrain packs for tns-godot, made on $(Get-Date -Format 'yyyy-MM-dd') from tools/terrain/recipes.
-After cloning, run tools/terrain/download_packs.ps1 to download and unpack them into data/base.
+To use them, download the five zips below and unzip each into tns-godot/data/base (each zip holds its pack's folder, for example terrain/). packs.txt lists how many files each pack should have.
 $(($manifest | Select-Object -Skip 1 | ForEach-Object { $p = $_.Split(','); "- {0}: {1:N0} files, {2:0} MB" -f $p[0], [int]$p[1], ([double]$p[2] / 1MB) }) -join "`n")
 
 Made from these sources, whose licences ask for this credit (more in CREDITS.md):
@@ -88,5 +85,4 @@ Made from these sources, whose licences ask for this credit (more in CREDITS.md)
 & $gh release create $Tag @zips --title "Terrain data $Tag" --notes $notes
 if ($LASTEXITCODE -ne 0) { throw "creating the release failed" }
 
-Set-Content -Path (Join-Path $PSScriptRoot "pack_release.txt") -Value $Tag -Encoding ascii
-"done: release $Tag. pack_release.txt now names it; commit that file."
+"done: release $Tag"
