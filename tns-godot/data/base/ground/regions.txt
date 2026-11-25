@@ -1,0 +1,23 @@
+# Names of the numbers in regions.png (make_ground_regions.ps1): "region <red value> <name>" and
+# "zone <green value> <name>". Textures: regional/<kind>_<name>.png.
+region 1 north_america
+region 2 latin_america
+region 3 europe
+region 4 north_eurasia
+region 5 middle_east
+region 6 africa
+region 7 south_asia
+region 8 east_asia
+region 9 southeast_asia
+region 10 australia
+zone 1 boreal
+zone 2 desert_dunes
+zone 3 desert_rock
+zone 4 desert_sand_sea
+zone 5 desert_gravel_tanezrouft
+zone 6 desert_erg_oriental
+zone 7 desert_taklamakan
+zone 8 desert_great_sand_sea
+zone 9 desert_sand_sheet_selima
+zone 10 desert_namib
+zone 11 desert_gravel_gobi

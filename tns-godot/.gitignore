@@ -1,0 +1,19 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# Tool build output
+tools/**/bin/
+tools/**/obj/
+
+# Baked terrain is rebuilt from tools/terrain/recipes
+data/base/terrain*/
+data/base/surface*/
+data/base/water*/
+data/base/cover*/
+data/base/detail*/
+
+# Keep terrain code and recipes visible despite the parent repository's terrain folder rule.
+!/src/Core/Terrain/
+!/src/Map/Terrain/
+!/tools/terrain/

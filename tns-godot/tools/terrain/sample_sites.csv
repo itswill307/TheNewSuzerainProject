@@ -1,0 +1,32 @@
+# Where to look for each ground texture sample (terrain samplepick, download_s2_samples.ps1):
+# name (kind_place; the kind is the land cover kind it is for), latitude, longitude of the place it
+# should look like, how far from it to search (degrees), and optionally the most built-up ground
+# allowed (share; default 0.05: the map counts villages and roads as built up) and of water
+# (default 0.0015; paddy country has ponds everywhere, so Thailand allows more). Only the samples a
+# texture is made from (make_ground_textures.ps1) are listed. Wetland is not: no 88 km window
+# anywhere is more than about 60% wetland, so it keeps its 44 km sample.
+#
+# Every window was then looked at (small previews). Radius 0 marks a place fixed by hand after the
+# search found a window with something in it that would repeat: forest strips in Mato Grosso and
+# Bahia (now Parana), woods west of Chartres (now the open Beauce), irrigation circles and a river
+# at Harran (now the Nineveh plain), semi-desert and a canal in Rajasthan (now Haryana), canyons
+# and badlands in the Owyhee (now the Oregon high desert), mine scars in West Virginia (now the
+# Pennsylvania forest).
+name,lat,lon,radius,max_built,max_water
+crop_iowa,42.5,-93.5,2,
+grass_kazakh,48.5,69.5,3,
+shrub_australia,-25.5,133.5,3,
+tree_congo,0.5,22.5,3,
+crop_beauce,48.25,1.65,0,
+crop_russia,51.5,40.5,3,
+crop_haryana,29.6,75.55,0,
+crop_china,34.5,115.5,2,0.15
+crop_thailand,15.5,102.5,3,,0.003
+crop_parana,-22.75,-54.15,0,
+crop_nigeria,12.5,8.5,3,
+crop_nineveh,35.95,42.55,0,
+crop_australia,-32.5,148.5,3,
+tree_boreal,58.5,50.5,3,
+tree_pennsylvania,41.65,-78.35,0,
+grass_savanna,-2.5,34.5,3,
+shrub_oregon,43.25,-119.95,0,

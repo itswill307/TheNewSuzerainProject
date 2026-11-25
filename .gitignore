@@ -6,3 +6,6 @@
 **/terrain/
 modis_lc_type1_texture_array.asset
 **/.claude/skills/
+
+# Raw elevation downloads (large; fetched with tns-godot/tools/terrain scripts)
+terrain-sources/

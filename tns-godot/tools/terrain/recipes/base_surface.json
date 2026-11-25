@@ -1,0 +1,78 @@
+{
+  // What the ground looks like.
+  //   Land cover:  ESA WorldCover 2021 (download_worldcover.ps1), at 160 m: what each place is,
+  //                such as forest, cropland, city, bare rock or water.
+  //   Colours:     measured per kind of ground from NASA Blue Marble, July 2004, averaged over
+  //                about 30 km so its shadows cancel out (see ColourTable.cs).
+  //   Sea colour:  from the depth of the sea bed in ETOPO 2022.
+  "name": "Base Earth surface",
+  "coverOutput": "../../../data/base/cover",
+  "colourOutput": "../../../data/base/surface",
+  "waterOutput": "../../../data/base/water",
+  "detailOutput": "../../../data/base/detail",
+
+  // Sharper colour (500 m Blue Marble, download_bluemarble500.ps1) for the detail tiles, down to
+  // level 8 (300 m), in these squares:
+  //   detailFineSquares: where the bland survey found the map smooth up close (terrain bland).
+  //   openSquares:       open ground that is not mountains (deserts, fields, grassland, shrub,
+  //                      tundra, wetland; make_open_squares.ps1), where coarse colour shows as
+  //                      soft blobs at country zoom. The blended colour goes one level deeper
+  //                      there too (colourOpenMaxLevel, a sample every 610 m), to meet the land cover better.
+  "detailImages": "../../../../terrain-sources/bluemarble_500m",
+  "detailFineSquares": "../lists/detail_fine_squares.csv",
+  "detailFineMaxLevel": 8,
+  "openSquares": "../lists/open_squares.csv",
+  "colourOpenMaxLevel": 7,
+  //   detailFillSquares: whole forest regions the lists already reach into, and gaps in the lists
+  //                      (make_fill_squares.ps1), so a uniform region never changes detail along
+  //                      a square's edge.
+  "detailFillSquares": "../lists/fill_squares.csv",
+  "detailAreaKm2": 100,
+
+  "landCover": "../../../../terrain-sources/worldcover_160m",
+  // WorldCover stops at about 82.8 N (Sentinel-2 sees no further). North of that, the north coasts
+  // of Greenland and Ellesmere Island: ice inside the Natural Earth glacier outlines, bare ground
+  // outside (make_arctic_cover.ps1).
+  "landCoverFill": "../../../../terrain-sources/worldcover_arctic",
+  "colourImage": "../../../../terrain-sources/bluemarble_2km/bluemarbleworld.200407x21600x10800.png",
+  "colourCache": "../../../../terrain-sources/surface_colours.bin",
+  "elevation": {
+    "path": "../../../../terrain-sources/etopo2022_15s"
+  },
+
+  // Up close (levels 7 to 9, down to one sample every 153 m) the game draws the land cover
+  // kind by kind with sharp edges, coasts included. A finer cover tile is only stored where it
+  // draws the edges differently over more than coverAreaKm2 of ground.
+  "maxLevel": 9,
+  "coverMinLevel": 7,
+  "coverAreaKm2": 20,
+  "coverMaxLevel": 8,
+  "coverMatchHeights": "../../../data/base/terrain",
+  // Land cover is one level finer than the heights wherever they are finer than plains (level 7):
+  // level 9 (153 m) over the Alps, Pyrenees, Scandinavia and other hill and mountain country.
+  "coverPlainsHeightLevel": 7,
+  "coverLevelsBeyondHeights": 1,
+
+  // Far away (levels 0 to 6) it draws blended colour and water instead: there, many kinds of
+  // ground share one pixel, and their average is what the eye sees.
+  "colourMaxLevel": 6,
+  "waterMaxLevel": 9,
+  "colourTolerance": 0.04,
+  "colourAreaKm2": 100,
+  "waterAreaKm2": 1.0,
+  "waterSteps": 16,
+  "colourQuality": 85,
+
+  // Each kind of ground takes the average colour of the picture within this distance.
+  "colourRadiusKm": 30,
+
+  // Water higher than this above the sea is a lake or river; sea this deep or deeper is darkest.
+  "lakeAboveM": 25,
+  "deepestSeaM": 6000,
+
+  // Fixed colours (sRGB 0-1) for any kind of ground, replacing the measured ones everywhere, e.g.
+  //   "built": [0.45, 0.43, 0.41]
+  // Kinds: tree, shrub, grass, crop, built, bare, snow, water, wetland, mangrove, moss.
+  // To paint colours by region instead, edit data/base/cover/cover_colours.png.
+  "classColours": {}
+}

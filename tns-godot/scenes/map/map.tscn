@@ -1,0 +1,26 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://src/Map/MapView.cs" id="1_view"]
+[ext_resource type="Shader" path="res://shaders/map/map_terrain.gdshader" id="2_shader"]
+[ext_resource type="Script" path="res://src/Map/MapInput.cs" id="4_input"]
+[ext_resource type="Script" path="res://src/Map/Terrain/TerrainRenderer.cs" id="5_terrain"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_map"]
+shader = ExtResource("2_shader")
+
+[node name="Map" type="Node3D"]
+script = ExtResource("1_view")
+
+[node name="Terrain" type="Node3D" parent="."]
+script = ExtResource("5_terrain")
+Material = SubResource("ShaderMaterial_map")
+
+[node name="Camera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 40000)
+current = true
+fov = 30.0
+near = 100.0
+far = 120000.0
+
+[node name="Input" type="Node" parent="."]
+script = ExtResource("4_input")

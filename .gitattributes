@@ -1,6 +1,11 @@
 # Auto detect text files and perform LF normalization
 * text=auto
-*.png filter=lfs diff=lfs merge=lfs -text
-*.tif filter=lfs diff=lfs merge=lfs -text
-*.svg filter=lfs diff=lfs merge=lfs -text
-*.zip filter=lfs diff=lfs merge=lfs -text
+
+# Pictures and other binary files are stored in ordinary git: none of the Godot project's files is
+# near GitHub's 100 MB limit. (The unity branch still keeps its large files in Git LFS.) The baked
+# terrain packs are far too big for git and are shared as a GitHub release instead; see
+# tns-godot/README.md, "Running".
+*.png binary
+*.jpg binary
+*.tif binary
+*.zip binary

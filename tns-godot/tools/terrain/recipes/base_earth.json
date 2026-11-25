@@ -1,0 +1,61 @@
+{
+  // The game's base terrain.
+  //   Whole world, coarse: NOAA ETOPO 2022, about 610 m between samples north–south.
+  //   Mountains, fine:     Copernicus GLO-90 for selected squares, about 153 m north–south.
+  "name": "Base Earth",
+  "output": "../../../data/base/terrain",
+
+  // 0 clamps every below-sea-level sample. Set to null to preserve negative heights.
+  "minElevationM": 0,
+
+  // Which tiles are worth storing. Mountains are drawn at true height, so what a finer tile
+  // changes on screen is the slope shading, not the outline of the ground. A tile is stored
+  // when its slopes differ from the coarser tile above it by more than detailSlope (0.06 = 6 m
+  // in 100 m) over more than detailAreaKm2 of ground. Everywhere else the game draws the
+  // coarser tile, and the two look the same.
+  //   Raise either number for a smaller pack with softer mountains, lower for the opposite.
+  //   "terrain plan" predicts the result of a change in seconds; see the README.
+  //   These values give about 700 MB. 0.06 / 1200 gives about 460 MB with almost nothing at
+  //   level 9; 0.08 / 300 gives about 1 GB with twice the level 9 coverage.
+  "detailSlope": 0.06,
+  "detailAreaKm2": 800,
+
+  // Boxes where the detail is set by hand instead, as [west, south, east, north]:
+  //   "maxLevel" stores nothing deeper than that level inside the box,
+  //   "minLevel" stores every tile down to that level inside the box, however flat.
+  // For example, to keep all of the Alps at level 9 and Antarctica coarse:
+  //   { "name": "Alps", "bounds": [5, 44, 16, 48], "minLevel": 9 },
+  //   { "name": "Antarctica", "bounds": [-180, -90, 180, -60], "maxLevel": 5 }
+  "detailAreas": [],
+
+  // Dune seas, rocky plateaus and steppe where the bland survey found relief: kept in full however
+  // gentle, because the slope shading (which steepens slopes 3x) shows what the detail rule would drop.
+  "keepSquares": "../lists/relief_squares_all.csv",
+  "keepSquaresLevel": 9,
+
+  // Heights are rounded to 2 m, which compresses noticeably better than 1 m.
+  "heightStepM": 2,
+
+  // Sources from bottom to top: later entries cover earlier ones where they have data.
+  "sources": [
+    {
+      // NOAA ETOPO 2022, 15 arc-seconds, ice surface, in metres (download_etopo2022.ps1).
+      "path": "../../../../terrain-sources/etopo2022_15s",
+      "maxLevel": 7
+    },
+    // ETOPO again, one level finer (about 305 m), only in the squares where the survey found
+    // relief the coarser level hides: dune seas, rocky plateaus and steppe (terrain bland).
+    {
+      "path": "../../../../terrain-sources/etopo2022_15s",
+      "maxLevel": 8,
+      "squares": "../lists/relief_squares_all.csv"
+    },
+    // Copernicus 90 m: the 2,000 steepest squares (terrain rugged), plus the 632 squares of dunes and
+    // rock with the most hidden relief (lists/relief_squares.txt). Remove this source for a
+    // coarse-only bake, for example when generating a fresh square list.
+    {
+      "path": "../../../../terrain-sources/copernicus_glo90",
+      "maxLevel": 9
+    }
+  ]
+}

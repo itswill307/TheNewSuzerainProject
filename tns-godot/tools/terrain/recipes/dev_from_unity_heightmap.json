@@ -1,0 +1,15 @@
+{
+  // Small test pack made from the Unity project's 8192 x 4096 height image (about 5 km per
+  // sample). Only for development: bake base_earth.json for the real thing.
+  "name": "Dev Earth (Unity heightmap)",
+  "output": "../../../data/base/terrain",
+  "minElevationM": 0,
+  "sources": [
+    {
+      "path": "../../../../TheNewSuzerain/Assets/Map/Textures/height01_u16.tif",
+      // The image stores 0..65535 for -10994 m .. 8849 m.
+      "valueScale": 0.30278477,
+      "valueOffset": -10994
+    }
+  ]
+}

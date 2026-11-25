@@ -1,0 +1,29 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/map/map.tscn" id="1_map"]
+[ext_resource type="Script" path="res://src/Dev/MapDebugHud.cs" id="2_hud"]
+[ext_resource type="Script" path="res://src/Dev/CaptureRunner.cs" id="3_capture"]
+
+[sub_resource type="Environment" id="Environment_space"]
+background_mode = 1
+background_color = Color(0.015, 0.02, 0.035, 1)
+
+[node name="Main" type="Node3D"]
+
+[node name="Map" parent="." instance=ExtResource("1_map")]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_space")
+
+[node name="Dev" type="CanvasLayer" parent="."]
+
+[node name="Hud" type="Label" parent="Dev" node_paths=PackedStringArray("Map")]
+offset_left = 14.0
+offset_top = 10.0
+script = ExtResource("2_hud")
+Map = NodePath("../../Map")
+
+[node name="CaptureRunner" type="Node" parent="Dev" node_paths=PackedStringArray("Map", "Hud")]
+script = ExtResource("3_capture")
+Map = NodePath("../../Map")
+Hud = NodePath("../Hud")

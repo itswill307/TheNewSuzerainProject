@@ -1,0 +1,6 @@
+# Ground covered by each kind's texture and its regional versions, km (make_ground_textures.ps1).
+tree 88
+shrub 88
+grass 88
+crop 88
+wetland 44
